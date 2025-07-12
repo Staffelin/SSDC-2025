@@ -27,7 +27,11 @@ orders, order_items, products, cat_trans, customers, payments, reviews, mql, dea
 # merge helper
 items = order_items.merge(products[["product_id","product_category_name"]], on="product_id", how="left")
 items = items.merge(cat_trans, on="product_category_name", how="left")
-
+st.set_page_config(
+    page_title="E-commerce Dashboard",
+    layout="wide",          # <-- ini yang bikin pakai lebar penuh
+    initial_sidebar_state="expanded"
+)
 # Sidebar: filter periode
 st.sidebar.header("Filter periode")
 min_date = st.sidebar.date_input("Dari", orders["order_purchase_timestamp"].min().date())
@@ -74,7 +78,7 @@ fig_map.update_layout(
     mapbox_center={"lat": -14.2350, "lon": -51.9253}, # Center on Brazil
     margin={"r":0,"t":40,"l":0,"b":0}
 )
-st.plotly_chart(fig_map)
+
 
 
 # 1. Tren Revenue & Jumlah Pesanan Bulanan
@@ -110,8 +114,31 @@ st.header("🌎 Heatmap Revenue per Provinsi")
 ord_cust = orders.merge(customers[["customer_id","customer_state"]], on="customer_id")
 oi2 = order_items.merge(ord_cust, on="order_id")
 prov = oi2.groupby("customer_state").price.sum().reset_index()
-# butuh geojson Brasil jika ingin peta sebenarnya
-st.dataframe(prov.sort_values("price", ascending=False).head(10))
+
+# Fetch GeoJSON
+geojson_url = "https://raw.githubusercontent.com/codeforgermany/click_that_hood/main/public/data/brazil-states.geojson"
+
+# Create choropleth map
+fig4 = px.choropleth(
+    prov,
+    geojson=geojson_url,
+    locations='customer_state',
+    featureidkey='properties.sigla',
+    color='price',
+    color_continuous_scale="Viridis",
+    scope="south america",
+    title="Revenue by State"
+)
+fig4.update_geos(fitbounds="locations", visible=False)
+
+# Display two maps side by side
+col1, col2 = st.columns(2)
+with col1:
+    st.subheader("Revenue by Geolocation")
+    st.plotly_chart(fig_map, use_container_width=True)
+with col2:
+    st.subheader("Revenue by State")
+    st.plotly_chart(fig4, use_container_width=True)
 
 # 4. Distribusi Jenis Pembayaran & Revenue Share
 st.header("💳 Distribusi Jenis Pembayaran & Revenue Share")
@@ -153,8 +180,25 @@ avg_score = rev_cat.groupby("product_category_name_english").review_score.mean()
 fig6 = px.bar(avg_score, x="review_score", y="product_category_name_english", orientation="h", title="Avg Score by Category (Top 10)")
 st.plotly_chart(fig6, use_container_width=True)
 
+# Distribusi Ukuran Katalog & Perkiraan Pendapatan MQL
+st.header("📊 Distribusi Ukuran Katalog & Perkiraan Pendapatan MQL (Marketing Qualified Lead)")
+colA, colB = st.columns(2)
+with colA:
+    fig_catalog = px.histogram(
+        deals, x="declared_product_catalog_size", nbins=30,
+        title="Distribusi Ukuran Katalog Calon Pelanggan"
+    )
+    st.plotly_chart(fig_catalog, use_container_width=True)
+with colB:
+    fig_rev = px.histogram(
+        deals, x="declared_monthly_revenue", nbins=510,
+        range_x=[0, 5000000],
+        title="Distribusi Perkiraan Pendapatan Bulanan MQL"
+    )
+    st.plotly_chart(fig_rev, use_container_width=True)
+
 # 7. Conversion Funnel MQL → Closed Deals by Origin
-st.header("🎯 Conversion Funnel: MQL → Closed Deals by Origin")
+st.header("🎯 Conversion Funnel: MQL(Marketing Qualified Lead) → Closed Deals by Origin")
 m = mql[["mql_id","origin"]]
 d = deals[["mql_id","won_date"]]
 funnel = m.merge(d, on="mql_id", how="left").groupby("origin").agg(
