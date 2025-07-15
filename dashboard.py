@@ -19,10 +19,11 @@ def load_data():
     mql              = pd.read_csv("E-commerce/marketing_qualified_leads_dataset.csv", parse_dates=["first_contact_date"])
     deals            = pd.read_csv("E-commerce/closed_deals_dataset.csv", parse_dates=["won_date"])
     geolocation      = pd.read_csv("E-commerce/geolocation_dataset.csv")
-    return orders, order_items, products, cat_trans, customers, payments, reviews, mql, deals, geolocation
+    sellers          = pd.read_csv("E-commerce/sellers_dataset.csv")
+    return orders, order_items, products, cat_trans, customers, payments, reviews, mql, deals, geolocation, sellers
 
 # load
-orders, order_items, products, cat_trans, customers, payments, reviews, mql, deals, geolocation = load_data()
+orders, order_items, products, cat_trans, customers, payments, reviews, mql, deals, geolocation, sellers = load_data()
 
 # merge helper
 items = order_items.merge(products[["product_id","product_category_name"]], on="product_id", how="left")
@@ -52,10 +53,47 @@ geo_agg = geolocation.groupby('geolocation_zip_code_prefix').agg({
     'geolocation_lng': 'mean'
 }).reset_index()
 
-# Merge with aggregated geolocation data
-df_map = pd.merge(df_map, geo_agg, left_on='customer_zip_code_prefix', right_on='geolocation_zip_code_prefix')
+# Merge customer geolocation
+df_map = pd.merge(df_map, geo_agg, left_on='customer_zip_code_prefix', right_on='geolocation_zip_code_prefix', suffixes=(None, '_customer'))
 
-# Calculate revenue by location
+# Merge seller geolocation
+sellers_geo = sellers.merge(geo_agg, left_on='seller_zip_code_prefix', right_on='geolocation_zip_code_prefix', suffixes=(None, '_seller'))
+
+# Merge order_items with sellers to get seller_id per order
+order_seller = order_items[['order_id', 'seller_id']].merge(sellers_geo[['seller_id', 'geolocation_lat', 'geolocation_lng']], on='seller_id', how='left')
+order_seller = order_seller.rename(columns={'geolocation_lat': 'seller_lat', 'geolocation_lng': 'seller_lng'})
+
+# Merge with orders to get customer info
+orders_with_seller = orders[['order_id', 'customer_id', 'order_purchase_timestamp']].merge(order_seller, on='order_id', how='left')
+
+# Merge customer geolocation
+customers_geo = customers.merge(geo_agg, left_on='customer_zip_code_prefix', right_on='geolocation_zip_code_prefix', how='left')
+customers_geo = customers_geo.rename(columns={'geolocation_lat': 'customer_lat', 'geolocation_lng': 'customer_lng'})
+orders_with_seller = orders_with_seller.merge(customers_geo[['customer_id', 'customer_lat', 'customer_lng']], on='customer_id', how='left')
+
+# Calculate distance in km (Haversine formula)
+def haversine(lat1, lon1, lat2, lon2):
+    R = 6371  # Earth radius in km
+    lat1, lon1, lat2, lon2 = map(np.radians, [lat1, lon1, lat2, lon2])
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    a = np.sin(dlat/2.0)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon/2.0)**2
+    c = 2 * np.arcsin(np.sqrt(a))
+    return R * c
+
+orders_with_seller['distance_km'] = haversine(
+    orders_with_seller['customer_lat'], orders_with_seller['customer_lng'],
+    orders_with_seller['seller_lat'], orders_with_seller['seller_lng']
+)
+
+first_orders = (
+    orders_with_seller
+    .sort_values("order_purchase_timestamp")
+    .drop_duplicates("customer_id")
+    .loc[:, ["customer_id", "distance_km"]]
+)
+
+# orders_with_distance now contains order_id, customer_id, seller_id, order_purchase_timestamp, customer_lat, customer_lng, seller_lat, seller_lng, distance_km
 revenue_by_location = df_map.groupby(['geolocation_lat', 'geolocation_lng']).agg(
     total_revenue=('payment_value', 'sum')
 ).reset_index()
@@ -207,6 +245,78 @@ funnel = m.merge(d, on="mql_id", how="left").groupby("origin").agg(
 ).reset_index()
 funnel["conversion_rate %"] = (funnel["deals_closed"]/funnel["leads"]*100).round(1)
 st.dataframe(funnel.sort_values("conversion_rate %", ascending=False))
+
+# 7b. Conversion Rate by Seller-Customer Distance
+st.header("📏 Conversion Rate by Seller-Customer Distance")
+
+# — 1) Create date‐only columns on deals and orders for matching
+deals["won_date_date"]     = deals["won_date"].dt.date
+orders["purchase_date"]    = orders["order_purchase_timestamp"].dt.date
+
+# — 2) Join deals → orders to pull in customer_id (one row per mql_id)
+deals_orders = (
+    deals
+    .merge(
+        orders[["customer_id", "purchase_date"]],
+        left_on="won_date_date",
+        right_on="purchase_date",
+        how="left"
+    )
+    .drop_duplicates("mql_id")
+)
+
+# — 3) Merge in your precomputed first‐order distance
+deals_with_distance = (
+    deals_orders
+    .merge(
+        first_orders[["customer_id", "distance_km"]],
+        on="customer_id",
+        how="left"
+    )
+)
+
+# — 4) Attach distance back onto all leads (MQL)
+leads_with_distance = (
+    mql
+    .merge(
+        deals_with_distance[["mql_id", "distance_km"]],
+        on="mql_id",
+        how="left"
+    )
+)
+
+# — 5) Bin distances and compute conversion rate per band
+bins   = [0, 10, 50, 200, np.inf]
+labels = ['<10km', '10-50km', '50-200km', '>200km']
+leads_with_distance['distance_band'] = pd.cut(
+    leads_with_distance['distance_km'],
+    bins=bins,
+    labels=labels,
+    include_lowest=True
+)
+conv_by_dist = (
+    leads_with_distance
+    .groupby('distance_band')
+    .agg(
+        leads=('mql_id', 'count'),
+        converted=('distance_km', lambda x: x.notna().sum())
+    )
+    .reset_index()
+)
+conv_by_dist['conversion_rate_%'] = (conv_by_dist['converted'] / conv_by_dist['leads'] * 100).round(1)
+
+# — 6) Plot
+fig_conv_dist = px.bar(
+    conv_by_dist,
+    x='distance_band',
+    y='conversion_rate_%',
+    labels={
+      'conversion_rate_%': 'Conversion Rate (%)',
+      'distance_band': 'Seller-Customer Distance'
+    },
+    title='Lead Conversion Rate by Seller-Customer Distance Band'
+)
+st.plotly_chart(fig_conv_dist, use_container_width=True)
 
 # 8. Rasio Pelanggan Repeat vs New
 st.header("🔄 Rasio Pelanggan Repeat vs New")
