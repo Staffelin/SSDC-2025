@@ -4,6 +4,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
+from gemini import get_response
 
 # --- Helpers ---
 @st.cache_data
@@ -34,11 +35,37 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 # Sidebar: filter periode
-st.sidebar.header("Filter periode")
-min_date = st.sidebar.date_input("Dari", orders["order_purchase_timestamp"].min().date())
-max_date = st.sidebar.date_input("Sampai", orders["order_purchase_timestamp"].max().date())
-mask = (orders["order_purchase_timestamp"].dt.date >= min_date) & (orders["order_purchase_timestamp"].dt.date <= max_date)
-orders = orders[mask]
+# st.sidebar.header("Filter periode")
+# min_date = st.sidebar.date_input("Dari", orders["order_purchase_timestamp"].min().date())
+# max_date = st.sidebar.date_input("Sampai", orders["order_purchase_timestamp"].max().date())
+# mask = (orders["order_purchase_timestamp"].dt.date >= min_date) & (orders["order_purchase_timestamp"].dt.date <= max_date)
+# orders = orders[mask]
+
+with st.sidebar:
+    st.header("💬 Chatbot")
+
+    # initialize history
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+
+    # this form will auto-clear its inputs when submitted
+    with st.form("chat_form", clear_on_submit=True):
+        user_input = st.text_input("You:", key="chat_form_input")
+        submitted = st.form_submit_button("Send")
+
+        if submitted and user_input:
+            # append user message
+            st.session_state.chat_history.append(("You", user_input))
+            # get bot reply
+            bot_reply = get_response(user_input)
+            st.session_state.chat_history.append(("Bot", bot_reply))
+
+    # display conversation history
+    for speaker, msg in st.session_state.chat_history:
+        if speaker == "You":
+            st.markdown(f"**You:** {msg}")
+        else:
+            st.markdown(f"**Bot:** {msg}")
 
 # --- Revenue Map ---
 st.header("Revenue by Geolocation")
