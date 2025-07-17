@@ -245,111 +245,114 @@ avg_score = rev_cat.groupby("product_category_name_english").review_score.mean()
 fig6 = px.bar(avg_score, x="review_score", y="product_category_name_english", orientation="h", title="Avg Score by Category (Top 10)")
 st.plotly_chart(fig6, use_container_width=True)
 
-# Distribusi Ukuran Katalog & Perkiraan Pendapatan MQL
-st.header("📊 Distribusi Ukuran Katalog & Perkiraan Pendapatan MQL (Marketing Qualified Lead)")
-colA, colB = st.columns(2)
-with colA:
-    fig_catalog = px.histogram(
-        deals, x="declared_product_catalog_size", nbins=30,
-        title="Distribusi Ukuran Katalog Calon Pelanggan"
-    )
-    st.plotly_chart(fig_catalog, use_container_width=True)
-with colB:
-    fig_rev = px.histogram(
-        deals, x="declared_monthly_revenue", nbins=510,
-        range_x=[0, 5000000],
-        title="Distribusi Perkiraan Pendapatan Bulanan MQL"
-    )
-    st.plotly_chart(fig_rev, use_container_width=True)
+# Distribusi Origin MQL (Pie Chart)
+st.header("🌐 Distribusi Origin Marketing Qualified Leads")
+origin_dist = mql["origin"].value_counts(normalize=True).mul(100).round(1).reset_index()
+origin_dist.columns = ["origin", "percentage"]
 
-# 7. Conversion Funnel MQL → Closed Deals by Origin
-st.header("🎯 Conversion Funnel: MQL(Marketing Qualified Lead) → Closed Deals by Origin")
-m = mql[["mql_id","origin"]]
-d = deals[["mql_id","won_date"]]
-funnel = m.merge(d, on="mql_id", how="left").groupby("origin").agg(
-    leads       = ("mql_id","count"),
-    deals_closed= ("won_date", lambda x: x.notna().sum())
-).reset_index()
-funnel["conversion_rate %"] = (funnel["deals_closed"]/funnel["leads"]*100).round(1)
-st.dataframe(funnel.sort_values("conversion_rate %", ascending=False))
+fig_origin = px.pie(
+    origin_dist,
+    values="percentage",
+    names="origin",
+    title="Distribution of MQL Origins (%)",
+    hole=0.3
+)
+st.plotly_chart(fig_origin, use_container_width=True)
 
-# 7b. Conversion Rate by Seller-Customer Distance
-st.header("📏 Conversion Rate by Seller-Customer Distance")
+st.header("📊 Conversion Rate by MQL Origin")
 
-# — 1) Create date‐only columns on deals and orders for matching
-deals["won_date_date"]     = deals["won_date"].dt.date
-orders["purchase_date"]    = orders["order_purchase_timestamp"].dt.date
-
-# — 2) Join deals → orders to pull in customer_id (one row per mql_id)
-deals_orders = (
-    deals
-    .merge(
-        orders[["customer_id", "purchase_date"]],
-        left_on="won_date_date",
-        right_on="purchase_date",
-        how="left"
-    )
-    .drop_duplicates("mql_id")
+# Merge MQL dengan closed_deals untuk mengetahui MQL yang berhasil dikonversi
+mql_conv = mql[["mql_id", "origin"]].merge(
+    deals[["mql_id", "won_date"]],
+    on="mql_id", how="left"
 )
 
-# — 3) Merge in your precomputed first‐order distance
-deals_with_distance = (
-    deals_orders
-    .merge(
-        first_orders[["customer_id", "distance_km"]],
-        on="customer_id",
-        how="left"
-    )
-)
-
-# — 4) Attach distance back onto all leads (MQL)
-leads_with_distance = (
-    mql
-    .merge(
-        deals_with_distance[["mql_id", "distance_km"]],
-        on="mql_id",
-        how="left"
-    )
-)
-
-# — 5) Bin distances and compute conversion rate per band
-bins   = [0, 10, 50, 200, np.inf]
-labels = ['<10km', '10-50km', '50-200km', '>200km']
-leads_with_distance['distance_band'] = pd.cut(
-    leads_with_distance['distance_km'],
-    bins=bins,
-    labels=labels,
-    include_lowest=True
-)
-conv_by_dist = (
-    leads_with_distance
-    .groupby('distance_band')
+conv_by_origin = (
+    mql_conv.groupby("origin")
     .agg(
-        leads=('mql_id', 'count'),
-        converted=('distance_km', lambda x: x.notna().sum())
+        total_leads=("mql_id", "count"),
+        deals_closed=("won_date", lambda x: x.notna().sum())
     )
     .reset_index()
 )
-conv_by_dist['conversion_rate_%'] = (conv_by_dist['converted'] / conv_by_dist['leads'] * 100).round(1)
+conv_by_origin["conversion_rate_%"] = (conv_by_origin["deals_closed"] / conv_by_origin["total_leads"] * 100).round(1)
 
-# — 6) Plot
-fig_conv_dist = px.bar(
-    conv_by_dist,
-    x='distance_band',
-    y='conversion_rate_%',
-    labels={
-      'conversion_rate_%': 'Conversion Rate (%)',
-      'distance_band': 'Seller-Customer Distance'
-    },
-    title='Lead Conversion Rate by Seller-Customer Distance Band'
+# Sort dari terendah ke tertinggi
+conv_by_origin = conv_by_origin.sort_values("conversion_rate_%", ascending=True)
+
+fig_conv_origin = px.bar(
+    conv_by_origin,
+    x="origin",
+    y="conversion_rate_%",
+    text="conversion_rate_%",
+    title="Conversion Rate by MQL Origin",
+    labels={"conversion_rate_%": "Conversion Rate (%)", "origin": "MQL Origin"},
+    color="conversion_rate_%"
 )
-st.plotly_chart(fig_conv_dist, use_container_width=True)
+fig_conv_origin.update_traces(texttemplate='%{text}%', textposition='outside')
+st.plotly_chart(fig_conv_origin, use_container_width=True)
 
-# 8. Rasio Pelanggan Repeat vs New
-st.header("🔄 Rasio Pelanggan Repeat vs New")
-cust_orders = orders.groupby("customer_id").order_id.nunique().reset_index(name="count_orders")
-cust_orders["type"] = np.where(cust_orders["count_orders"]>=2, "Repeat", "New")
-ratio = cust_orders["type"].value_counts(normalize=True).mul(100).round(1).reset_index()
-ratio.columns = ["type","% of customers"]
-fig7 = px.pie(ratio, values="% of customers", names="type", title="New vs Repeat Customers")
-st.plotly_chart(fig7, use_container_width=True)
+st.header("💰 Average Declared Monthly Revenue by Business Segment")
+
+# Pastikan kolom numerik
+deals["declared_monthly_revenue"] = pd.to_numeric(deals["declared_monthly_revenue"], errors='coerce')
+
+# Ambil unique business segment
+all_segments = deals["business_segment"].dropna().unique()
+all_segments.sort()
+
+# Checklist interaktif di sidebar
+selected_segments = st.sidebar.multiselect(
+    "Pilih Business Segment yang ingin ditampilkan:",
+    options=all_segments,
+    default=list(all_segments)
+)
+
+# Filter data sesuai pilihan
+filtered_deals = deals[deals["business_segment"].isin(selected_segments)]
+
+# Hitung rata-rata revenue
+avg_rev_segment = (
+    filtered_deals.groupby("business_segment")
+    .agg(avg_monthly_revenue=("declared_monthly_revenue", "mean"))
+    .reset_index()
+    .sort_values("avg_monthly_revenue", ascending=False)
+)
+
+# Bar chart
+fig_rev_segment = px.bar(
+    avg_rev_segment,
+    x="avg_monthly_revenue",
+    y="business_segment",
+    orientation="h",
+    title="Average Declared Monthly Revenue by Business Segment (Filtered)",
+    labels={"avg_monthly_revenue": "Avg Declared Revenue", "business_segment": "Business Segment"},
+    text="avg_monthly_revenue",
+    color="avg_monthly_revenue"
+)
+fig_rev_segment.update_traces(texttemplate='Rp %{text:,.0f}', textposition='outside')
+st.plotly_chart(fig_rev_segment, use_container_width=True)
+
+
+st.header("📈 Tren Bulanan: MQL vs Closed Deals")
+
+# Bulanan MQL
+mql['month'] = mql['first_contact_date'].dt.to_period('M').dt.to_timestamp()
+mql_monthly = mql.groupby('month').agg(jumlah_mql=('mql_id', 'count')).reset_index()
+
+# Bulanan Closed Deals
+deals['month'] = deals['won_date'].dt.to_period('M').dt.to_timestamp()
+deals_monthly = deals.groupby('month').agg(jumlah_deals=('mql_id', 'count')).reset_index()
+
+# Gabungkan
+timeline = pd.merge(mql_monthly, deals_monthly, on="month", how="outer").fillna(0).sort_values("month")
+
+fig_trend = px.line(
+    timeline,
+    x="month",
+    y=["jumlah_mql", "jumlah_deals"],
+    labels={"value": "Jumlah", "month": "Bulan", "variable": "Tipe"},
+    title="Tren Bulanan: Jumlah MQL vs Closed Deals"
+)
+fig_trend.update_layout(legend_title_text='Tipe')
+st.plotly_chart(fig_trend, use_container_width=True)
