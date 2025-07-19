@@ -8,6 +8,10 @@ st.set_page_config(
     layout="wide"
 )
 
+# --- Variabel Desain Global ---
+THEME_COLOR = "royalblue"
+PLOTLY_TEMPLATE = "plotly_white"
+
 @st.cache_data
 def load_data():
     """Memuat semua dataset yang diperlukan dari direktori 'E-commerce/'."""
@@ -15,236 +19,223 @@ def load_data():
     try:
         payments = pd.read_csv(path + "order_payments_dataset.csv")
         customers = pd.read_csv(path + "customers_dataset.csv")
-        # <-- MODIFIKASI: Menambahkan parse_dates untuk orders -->
-        orders = pd.read_csv(path + "orders_dataset.csv", parse_dates=['order_purchase_timestamp'])
+        orders = pd.read_csv(path + "orders_dataset.csv", parse_dates=['order_purchase_timestamp', 'order_delivered_customer_date', 'order_estimated_delivery_date'])
         sellers = pd.read_csv(path + "sellers_dataset.csv")
         products = pd.read_csv(path + "products_dataset.csv")
         order_items = pd.read_csv(path + "order_items_dataset.csv")
-        order_reviews = pd.read_csv(path + "order_reviews_dataset.csv")
         deals = pd.read_csv(path + "closed_deals_dataset.csv", parse_dates=["won_date"])
+        cat_trans = pd.read_csv(path + "product_category_name_translation.csv")
+        reviews = pd.read_csv(path + "order_reviews_dataset_translated.csv")
+
     except FileNotFoundError as e:
-        st.error(f"Error: Salah satu file dataset tidak ditemukan di '{path}'. Pastikan semua file ada.")
+        st.error(f"Error: Salah satu file dataset tidak ditemukan di '{path}'. Pastikan semua file ada, termasuk 'order_reviews_dataset_translated.csv'.")
         st.stop()
-    return payments, customers, orders, sellers, products, order_items, order_reviews, deals
+    return payments, customers, orders, sellers, products, order_items, reviews, cat_trans, deals
 
+def format_snake_case(s):
+    if isinstance(s, str): return s.replace('_', ' ').title()
+    return s
 
-# Memuat data
-payments, customers, orders, sellers, products, order_items, order_reviews, deals = load_data()
+# Memuat semua data
+payments, customers, orders, sellers, products, order_items, reviews, cat_trans, deals = load_data()
+
+# --- Membuat DataFrame Utama (df_master) ---
+items = order_items.merge(products, on="product_id", how="left")
+items = items.merge(cat_trans, on="product_category_name", how="left")
+df_master = orders.merge(reviews, on="order_id", how="left")
+df_master = df_master.merge(items, on="order_id", how="left")
+df_master = df_master.merge(customers, on='customer_id', how='left')
+df_master['product_category_name_english'] = df_master['product_category_name_english'].dropna().apply(format_snake_case)
+
+# --- MULAI DASBOR ---
 
 # --- 2. Judul dan Kalimat Pembuka ---
 st.title("📈 Analisis Kinerja Bisnis E-commerce")
-st.markdown("""
-Dasbor ini dirancang untuk mengungkap wawasan strategis dari data operasional, mencakup analisis mendalam mengenai **preferensi pelanggan**, **kualitas produk**, dan **kinerja pengiriman** untuk mendorong pertumbuhan bisnis.
-""")
+st.markdown("Dasbor ini dirancang untuk mengungkap wawasan strategis dari data operasional, mencakup analisis mendalam mengenai **preferensi pelanggan**, **kualitas produk**, dan **kinerja pengiriman** untuk mendorong pertumbuhan bisnis.")
 st.markdown("---")
 
 # --- 3. Ringkasan Eksekutif: KPI dan Tren Pendapatan ---
 st.header("Gambaran Umum Kinerja Operasional")
-
-# <-- MODIFIKASI: Membuat tata letak 2 kolom -->
-col1, col2 = st.columns([1, 2]) # Kolom kiri lebih kecil untuk KPI
-
+col1, col2 = st.columns([1, 2])
 with col1:
-    # --- Kalkulasi metrik KPI ---
+    st.subheader("Metrik Utama")
     total_revenue = payments['payment_value'].sum()
     total_customers = customers['customer_unique_id'].nunique()
     total_orders = orders['order_id'].nunique()
     total_sellers = sellers['seller_id'].nunique()
     total_products = products['product_id'].nunique()
-
-    # --- Tampilkan KPI (sekarang di kolom kiri) ---
-    st.subheader("Metrik Utama")
-    
-    # <-- MODIFIKASI: Menggunakan notasi angka Indonesia -->
-    st.metric(
-        label="Total Pendapatan (R$)",
-        value=f"R$ {total_revenue/1_000_000:,.2f} Jt".replace(",", "X").replace(".", ",").replace("X", ".")
-    )
-    st.metric(
-        label="Total Pelanggan",
-        value=f"{total_customers:,}".replace(",", ".")
-    )
-    st.metric(
-        label="Total Pesanan",
-        value=f"{total_orders:,}".replace(",", ".")
-    )
-    st.metric(
-        label="Total Penjual (Seller)",
-        value=f"{total_sellers:,}".replace(",", ".")
-    )
-    st.metric(
-        label="Total Produk",
-        value=f"{total_products:,}".replace(",", ".")
-    )
-
+    st.metric(label="Total Pendapatan (R$)", value=f"R$ {total_revenue/1_000_000:,.2f} Jt".replace(",", "X").replace(".", ",").replace("X", "."))
+    st.metric(label="Total Pelanggan", value=f"{total_customers:,}".replace(",", "."))
+    st.metric(label="Total Pesanan", value=f"{total_orders:,}".replace(",", "."))
+    st.metric(label="Total Penjual (Seller)", value=f"{total_sellers:,}".replace(",", "."))
+    st.metric(label="Total Produk", value=f"{total_products:,}".replace(",", "."))
 with col2:
-    # --- Grafik Tren Pendapatan (sekarang di kolom kanan) ---
     st.subheader("Tren Pendapatan Bulanan")
-    
-    # Gabungkan data order dan payment untuk mendapatkan tanggal dan nilai pembayaran
     revenue_over_time = orders.merge(payments, on='order_id')
-    
-    # Ekstrak bulan dari tanggal pembelian
     revenue_over_time['month'] = revenue_over_time['order_purchase_timestamp'].dt.to_period('M').dt.to_timestamp()
-    
-    # Agregasi pendapatan per bulan
     monthly_revenue = revenue_over_time.groupby('month')['payment_value'].sum().reset_index()
-    
-    # Buat grafik
-    fig = px.area(
-        monthly_revenue,
-        x='month',
-        y='payment_value',
-        title="Pertumbuhan Pendapatan Seiring Waktu",
-        labels={'month': 'Bulan', 'payment_value': 'Total Pendapatan (R$)'}
-    )
-    fig.update_layout(height=450) # Menyesuaikan tinggi grafik
+    fig = px.area(monthly_revenue, x='month', y='payment_value', title="Pertumbuhan Pendapatan Seiring Waktu", labels={'month': 'Bulan', 'payment_value': 'Total Pendapatan (R$)'}, color_discrete_sequence=[THEME_COLOR], template=PLOTLY_TEMPLATE)
+    fig.update_layout(height=450)
     st.plotly_chart(fig, use_container_width=True)
 
 st.markdown("---")
 
-# ========== BRIDGING: Narasi Transisi ==========
-st.header("Eksplorasi Lebih Dalam: Preferensi Pelanggan & Dampak Ongkir")
-st.markdown(
-    "Selanjutnya, mari kita telusuri lebih dalam faktor-faktor kunci yang mempengaruhi preferensi pelanggan serta hubungannya dengan kepuasan dan biaya pengiriman."
-)
+# --- 4. Analisis Preferensi Pelanggan ---
+st.header("📊 Analisis Preferensi Pelanggan")
+st.markdown("Pilih sebuah provinsi untuk melihat kategori produk yang paling diminati di wilayah tersebut, atau pilih 'Semua Provinsi' untuk melihat gambaran nasional.")
 
-# ========== SECTION: KATEGORI PRODUK POPULER (DUA KOLOM BERSEBELAHAN) ==========
-st.subheader("Kategori Produk Paling Populer")
+# Siapkan data yang akan digunakan
+df_popular = df_master.dropna(subset=['product_category_name_english', 'customer_state'])
 
-# Siapkan data join orders, products, customers (tambahkan join customers jika ingin filter state)
-orders_items = orders.merge(pd.read_csv("E-commerce/order_items_dataset.csv"), on='order_id', how='left')
+# <-- MODIFIKASI: Menambahkan 'Semua Provinsi' ke dalam daftar dan menjadikannya default -->
+provinsi_list = ['Semua Provinsi'] + sorted(df_popular['customer_state'].unique().tolist())
+selected_state = st.selectbox("Pilih Wilayah Analisis:", provinsi_list)
 
-# 2. Gabungkan hasilnya dengan products berdasarkan product_id
-orders_items = orders_items.merge(products, on='product_id', how='left')
+# --- Tata letak dengan peta di kiri dan grafik di kanan ---
+col1, col2 = st.columns([1, 2])
 
-# 3. Gabungkan dengan customers untuk mendapatkan provinsi (optional, jika ingin filter per state)
-orders_items = orders_items.merge(customers[['customer_id', 'customer_state']], on='customer_id', how='left')
-
-
-col1, col2 = st.columns(2)
-
-# Kategori terpopuler secara keseluruhan
 with col1:
-    st.markdown("**Top 10 Kategori Produk (Keseluruhan)**")
-    top_cats = (
-        orders_items['product_category_name']
-        .value_counts()
-        .head(10)
-        .reset_index()
+    # Tampilkan peta
+    map_title = "Peta Pesanan Nasional" if selected_state == 'Semua Provinsi' else f"Lokasi Provinsi: {selected_state}"
+    st.markdown(f"**{map_title}**")
+    
+    state_order_counts = df_popular['customer_state'].value_counts().reset_index()
+    state_order_counts.columns = ['state', 'orders']
+    
+    geojson_url = "https://raw.githubusercontent.com/codeforgermany/click_that_hood/main/public/data/brazil-states.geojson"
+    
+    fig_map = px.choropleth(
+        state_order_counts,
+        geojson=geojson_url,
+        locations='state',
+        featureidkey='properties.sigla',
+        color='orders',
+        color_continuous_scale="Blues",
+        scope="south america"
     )
-    # Kolom hasil: 'index' untuk kategori, 'product_category_name' untuk count
-    top_cats.columns = ['Kategori', 'Jumlah Order']
+    
+    # <-- MODIFIKASI: Logika kondisional untuk zoom peta -->
+    if selected_state == 'Semua Provinsi':
+        # Tampilkan seluruh Brasil
+        fig_map.update_geos(fitbounds="geojson", visible=False)
+    else:
+        # Zoom ke provinsi yang dipilih
+        fig_map.update_geos(fitbounds="locations", visible=False)
+        fig_map.data[0].locations = [selected_state]
+
+    fig_map.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
+    st.plotly_chart(fig_map, use_container_width=True)
+
+with col2:
+    # <-- MODIFIKASI: Logika kondisional untuk data grafik batang -->
+    if selected_state == 'Semua Provinsi':
+        st.markdown("**Top 10 Kategori Produk (Nasional)**")
+        top_cats_data = df_popular['product_category_name_english'].value_counts().head(10).reset_index()
+    else:
+        st.markdown(f"**Top 10 Kategori Produk di Provinsi {selected_state}**")
+        top_cats_data = (
+            df_popular[df_popular['customer_state'] == selected_state]
+            ['product_category_name_english']
+            .value_counts()
+            .head(10)
+            .reset_index()
+        )
+    
+    top_cats_data.columns = ['Kategori', 'Jumlah Pesanan']
+    
     fig_top_cats = px.bar(
-        top_cats,
-        x='Kategori', y='Jumlah Order',
-        text='Jumlah Order',
-        color_discrete_sequence=["royalblue"]
+        top_cats_data,
+        x='Jumlah Pesanan',
+        y='Kategori',
+        text='Jumlah Pesanan',
+        orientation='h',
+        color_discrete_sequence=[THEME_COLOR],
+        template=PLOTLY_TEMPLATE
     )
-    fig_top_cats.update_layout(xaxis_tickangle=-45, height=350)
+    fig_top_cats.update_layout(
+        yaxis={'categoryorder':'total ascending'},
+        height=450,
+        yaxis_title="Kategori Produk",
+        xaxis_title="Jumlah Pesanan"
+    )
     st.plotly_chart(fig_top_cats, use_container_width=True)
 
-with col2:
-    st.markdown("**Top 5 Kategori Produk per Provinsi**")
-    provinsi_list = sorted(orders_items['customer_state'].dropna().unique())
-    pilih_state = st.selectbox("Pilih Provinsi", provinsi_list)
-    top5_state = (
-        orders_items[orders_items['customer_state'] == pilih_state]
-        .product_category_name
-        .value_counts()
-        .head(5)
-        .reset_index()
-    )
-    top5_state.columns = ['Kategori', 'Jumlah Order']
-    fig_top5_state = px.bar(
-        top5_state,
-        x='Kategori', y='Jumlah Order',
-        text='Jumlah Order',
-        color_discrete_sequence=["royalblue"]
-    )
-    fig_top5_state.update_layout(xaxis_tickangle=-45, height=350)
-    st.plotly_chart(fig_top5_state, use_container_width=True)
+st.markdown("---")
 
+# --- 5. Analisis Kualitas Produk & Kepuasan Pelanggan ---
+st.header("💬 Umpan Balik & Kualitas Produk")
+st.markdown("Menganalisis ulasan pelanggan untuk menemukan titik kekuatan dan area yang memerlukan perbaikan.")
+st.subheader("Peringkat Kategori Produk Berdasarkan Ulasan")
+min_reviews = st.slider("Jumlah minimum ulasan untuk ditampilkan:", min_value=10, max_value=200, value=50)
+category_quality = df_master.groupby('product_category_name_english').agg(average_score=('review_score', 'mean'), review_count=('review_score', 'count')).reset_index()
+category_quality_filtered = category_quality[category_quality['review_count'] >= min_reviews]
+col1, col2 = st.columns(2)
+with col1:
+    st.markdown("##### Kategori dengan Peringkat Tertinggi")
+    top_categories = category_quality_filtered.nlargest(5, 'average_score')
+    fig_top = px.bar(top_categories, x='average_score', y='product_category_name_english', orientation='h', text=top_categories['average_score'].apply(lambda x: f'{x:.2f}'), color_discrete_sequence=['#2ca02c'], template=PLOTLY_TEMPLATE)
+    fig_top.update_layout(yaxis={'categoryorder':'total ascending'}, xaxis_title="Skor Rata-rata", yaxis_title=None, xaxis=dict(range=[4,5]))
+    st.plotly_chart(fig_top, use_container_width=True)
+with col2:
+    st.markdown("##### Kategori dengan Peringkat Terendah")
+    bottom_categories = category_quality_filtered.nsmallest(5, 'average_score')
+    fig_bottom = px.bar(bottom_categories, x='average_score', y='product_category_name_english', orientation='h', text=bottom_categories['average_score'].apply(lambda x: f'{x:.2f}'), color_discrete_sequence=['#d62728'], template=PLOTLY_TEMPLATE)
+    fig_bottom.update_layout(yaxis={'categoryorder':'total descending'}, xaxis_title="Skor Rata-rata", yaxis_title=None, xaxis=dict(range=[1,5]))
+    st.plotly_chart(fig_bottom, use_container_width=True)
+
+st.subheader("Analisis Ulasan Negatif (Skor ≤ 2)")
+complaint_keywords = {
+    "Late Delivery": ["atraso", "demor", "prazo", "lento", "extravia", "nao chegou"],
+    "Product Not Received": ["nao recebi", "nao entregue", "nunca chegou", "consta entregue", "caixa vazia"],
+    "Bad Product Quality / Defective": ["quebra", "defeit", "qualidade ruim", "nao funciona", "pessim", "estraga", "avaria", "falso", "embalagem", "caixa"],
+    "Wrong Item Sent": ["diferente", "erra", "outro", "modelo", "cor", "anuncia", "trocado"],
+    "Missing Items / Partial Delivery": ["falta", "incompleto", "apenas", "só", "parte", "unidade", "kit", "parcial"],
+    "Return & Refund Issues": ["devolv", "troca", "dinheiro", "volta", "cancel", "reembolso", "estorno"]
+}
+def categorize_complaint(comment):
+    if not isinstance(comment, str): return "Lainnya"
+    comment_lower = comment.lower()
+    scores = {category: sum(1 for keyword in keywords if keyword in comment_lower) for category, keywords in complaint_keywords.items()}
+    max_score = max(scores.values())
+    if max_score == 0: return "Lainnya"
+    best_category = [category for category, score in scores.items() if score == max_score][0]
+    return best_category
+
+df_neg_reviews = df_master.dropna(subset=['review_comment_message', 'review_comment_message_en'])
+low_score_reviews = df_neg_reviews[df_neg_reviews['review_score'] <= 2].copy()
+low_score_reviews['complaint_category'] = low_score_reviews['review_comment_message'].apply(categorize_complaint)
+col1, col2 = st.columns(2)
+with col1:
+    st.markdown("##### Kategori Keluhan Utama")
+    category_counts = low_score_reviews['complaint_category'].value_counts().reset_index()
+    fig_complaints = px.bar(category_counts, x='count', y='complaint_category', orientation='h', text_auto=True, color_discrete_sequence=[THEME_COLOR], template=PLOTLY_TEMPLATE)
+    fig_complaints.update_layout(yaxis={'categoryorder':'total ascending'}, xaxis_title="Jumlah Ulasan Negatif", yaxis_title="Kategori Keluhan")
+    st.plotly_chart(fig_complaints, use_container_width=True)
+with col2:
+    st.markdown("##### Contoh Komentar Ulasan (dalam Bahasa Inggris)")
+    if not low_score_reviews.empty:
+        complaint_category_list = low_score_reviews['complaint_category'].unique().tolist()
+        selected_complaint = st.selectbox("Pilih kategori keluhan untuk melihat contoh:", options=complaint_category_list)
+        sample_comments = low_score_reviews[low_score_reviews['complaint_category'] == selected_complaint]
+        st.dataframe(sample_comments[['review_score', 'review_comment_message_en']].head(5))
+    else:
+        st.info("Tidak ada komentar untuk ditampilkan.")
 
 st.markdown("---")
 
-# ========== SECTION: REVIEW SCORE VS FREIGHT VALUE (BAR CHART) ==========
-st.subheader("Rata-Rata Review Score Berdasarkan Freight Value (Ongkir)")
-
-df_full = (
-    orders
-    .merge(order_items, on='order_id', how='left')
-    .merge(products, on='product_id', how='left')
-    .merge(customers[['customer_id', 'customer_state']], on='customer_id', how='left')
-    .merge(order_reviews[['order_id', 'review_score']], on='order_id', how='left')
-)
-
-# --- Sekarang df_full sudah punya kolom freight_value DAN review_score ---
-# Binning freight_value
-bins = [0, 10, 20, 30, 40, 50, float('inf')]
-labels = ["0-10", "10-20", "20-30", "30-40", "40-50", "50+"]
-df_full['freight_bin'] = pd.cut(df_full['freight_value'], bins=bins, labels=labels, right=False)
-
-review_freight = (
-    df_full
-    .groupby('freight_bin')['review_score']
-    .mean()
-    .reset_index()
-    .dropna()
-)
-
-fig_review = px.bar(
-    review_freight, x='freight_bin', y='review_score',
-    text=review_freight['review_score'].round(2),
-    labels={'freight_bin': 'Freight Value (R$)', 'review_score': 'Average Review Score'},
-    color_discrete_sequence=["royalblue"]
-)
-fig_review.update_traces(textposition='outside')
-fig_review.update_layout(yaxis=dict(range=[0, 5]), title="Average Review Score Drops as Shipping Cost (Freight Value) Increases")
-st.plotly_chart(fig_review, use_container_width=True)
-
-# ========== END: Narasi Penutup ==========
-st.markdown(
-    """
----
-Dari analisis ini, terlihat bahwa preferensi pelanggan sangat dipengaruhi oleh kategori produk tertentu yang berbeda di tiap provinsi. Selain itu, terdapat korelasi antara biaya pengiriman dan kepuasan pelanggan, yang dapat menjadi peluang insentif untuk mendorong konversi dan loyalitas pelanggan.
-"""
-)
-
-# ============= Marketing Conversion =====================
+# --- 6. Analisis Potensi Perluasan Pasar ---
+st.header("🚀 Potensi Perluasan Pasar (Analisis Prospek Penjual)")
+st.markdown("Menganalisis data prospek penjual (leads) untuk mengidentifikasi peluang pertumbuhan di segmen B2B atau penjual profesional.")
 counts = deals['lead_type'].value_counts().sort_values()
 proportions = counts / counts.sum()
-
-# --- Build bar chart ---
-fig = px.bar(
-    x=proportions.values,
-    y=proportions.index,
-    orientation='h',
-    labels={'x': 'Percentage of Leads', 'y': 'Lead Type'},
-    title='Distribusi Lead Type'
-)
-fig.update_traces(
-    text=[f'{p:.1%}' for p in proportions.values],
-    textposition='auto'
-)
-fig.update_layout(
-    xaxis_tickformat='.1%',
-    margin=dict(l=120, r=20, t=50, b=20)
-)
-
-# --- Layout ---
+fig_leads = px.bar(x=proportions.values, y=proportions.index, orientation='h', labels={'x': 'Persentase Prospek', 'y': 'Tipe Prospek'}, title='Distribusi Tipe Prospek Penjual yang Berhasil Diakuisisi', color_discrete_sequence=[THEME_COLOR], template=PLOTLY_TEMPLATE)
+fig_leads.update_traces(text=[f'{p:.1%}' for p in proportions.values], textposition='auto')
+fig_leads.update_layout(xaxis_tickformat='.1%')
 col1, col2 = st.columns([2, 1])
-
 with col1:
-    st.plotly_chart(fig, use_container_width=True)
-
+    st.plotly_chart(fig_leads, use_container_width=True)
 with col2:
-    pct = proportions.get('online_medium', 0)
-    pct_str = f'{pct:.1%}'.replace('.', ',')  # e.g. "39,7%"
-
-    st.header('Penjual Online-Medium menjadi kunci pertumbuhan')
-    st.write(
-        f'Dengan {pct_str} penjual berada di online_medium, strategi marketing harus fokus pada '
-        'aktivasi & akselerasi mereka. Dorongan insentif dan kampanye pertumbuhan jadi kunci '
-        'membuka potensi GMV top-tier.'
-    )
+    pct = proportions.get('Online Medium', 0) # Pastikan nama lead_type sesuai
+    pct_str = f'{pct:.1%}'.replace('.', ',')
+    st.subheader('Penjual "Online Medium" sebagai Kunci Pertumbuhan')
+    st.write(f"Dengan **{pct_str}** penjual yang berhasil diakuisisi berada di segmen 'Online Medium', strategi pemasaran harus fokus pada aktivasi & akselerasi mereka. Insentif yang tepat dan kampanye pertumbuhan dapat membuka potensi pendapatan yang signifikan dari segmen ini.")
