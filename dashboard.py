@@ -160,19 +160,96 @@ fig2 = px.line(monthly, x="month", y="orders", title="Monthly Number of Orders")
 col1.plotly_chart(fig1, use_container_width=True)
 col2.plotly_chart(fig2, use_container_width=True)
 
-# 2. Top 10 Kategori Produk by Revenue
-st.header("🏆 Top 10 Kategori Produk by Revenue")
-oi_cat = oi.merge(products[["product_id","product_category_name"]], on="product_id")
-oi_cat = oi_cat.merge(cat_trans, on="product_category_name")
-top_cat = (
-    oi_cat
-    .groupby("product_category_name_english")
-    .agg(revenue=("price", "sum"))          # agregasi price jadi revenue
-    .nlargest(10, "revenue")                # ambil 10 terbesar berdasarkan kolom revenue
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+
+# --- Load your data ---
+# Contoh load, sesuaikan path jika perlu!
+order_items = pd.read_csv("E-commerce/order_items_dataset.csv")
+products = pd.read_csv("E-commerce/products_dataset.csv")
+cat_trans = pd.read_csv("E-commerce/product_category_name_translation.csv")
+
+# --- Data preparation & join ---
+oi_prod = order_items.merge(
+    products[['product_id', 'product_category_name']],
+    on='product_id', how='left'
+).merge(
+    cat_trans, on='product_category_name', how='left'
+)
+oi_prod['price'] = pd.to_numeric(oi_prod['price'], errors='coerce')
+oi_prod = oi_prod.dropna(subset=['product_category_name_english', 'price'])
+
+st.header("Preferensi Pelanggan: Harga & Produk")
+
+unique_cats = sorted(oi_prod['product_category_name_english'].unique())
+min_price, max_price = float(oi_prod['price'].min()), float(oi_prod['price'].max())
+
+with st.container():
+    col1, col2 = st.columns([3,2])
+    with col1:
+        selected_cats = st.multiselect(
+            "Pilih Kategori Produk:",
+            unique_cats,
+            default=unique_cats[:6],
+            key="produk_filter"
+        )
+    with col2:
+        selected_price = st.slider(
+            "Rentang Harga Produk (Rp)",
+            min_value=min_price,
+            max_value=max_price,
+            value=(min_price, max_price),
+            step=100.0,
+            key="harga_filter"
+        )
+
+oi_filt = oi_prod[
+    (oi_prod['product_category_name_english'].isin(selected_cats)) &
+    (oi_prod['price'] >= selected_price[0]) &
+    (oi_prod['price'] <= selected_price[1])
+]
+
+fig_price_dist = px.histogram(
+    oi_filt,
+    x="price",
+    nbins=40,
+    title="Distribusi Harga Produk yang Dibeli",
+    labels={"price": "Harga Produk (Rp)"},
+    color_discrete_sequence=["#118ab2"]
+)
+st.plotly_chart(fig_price_dist, use_container_width=True)
+
+# --- Visualisasi B: Kategori Produk Favorit ---
+fav_cat = (
+    oi_filt.groupby('product_category_name_english')
+    .agg(jumlah_pembelian=('order_id','count'), revenue=('price','sum'))
+    .sort_values('jumlah_pembelian', ascending=False)
     .reset_index()
 )
-fig3 = px.bar(top_cat, x="revenue", y="product_category_name_english", orientation="h", title="Top 10 Categories")
-st.plotly_chart(fig3, use_container_width=True)
+
+fig_fav_cat = px.bar(
+    fav_cat, x='jumlah_pembelian', y='product_category_name_english',
+    orientation='h',
+    title='Kategori Produk Favorit (Berdasarkan Filter)',
+    labels={'jumlah_pembelian': 'Jumlah Pembelian', 'product_category_name_english': 'Kategori'}
+)
+st.plotly_chart(fig_fav_cat, use_container_width=True)
+
+# --- Visualisasi C: Boxplot Harga per Kategori ---
+# (Tampilkan hanya kategori yang muncul di filter)
+if len(selected_cats) > 0:
+    fig_box = px.box(
+        oi_filt,
+        x='product_category_name_english', y='price',
+        points='outliers',
+        title='Distribusi Harga Produk pada Kategori (Sesuai Filter)',
+        labels={'product_category_name_english': 'Kategori Produk', 'price': 'Harga (Rp)'}
+    )
+    fig_box.update_layout(xaxis_tickangle=-45)
+    st.plotly_chart(fig_box, use_container_width=True)
+else:
+    st.info("Pilih minimal satu kategori produk untuk melihat distribusi harga per kategori.")
 
 # 3. Peta Panas Revenue per Provinsi
 st.header("🌎 Heatmap Revenue per Provinsi")
@@ -291,47 +368,6 @@ fig_conv_origin = px.bar(
 )
 fig_conv_origin.update_traces(texttemplate='%{text}%', textposition='outside')
 st.plotly_chart(fig_conv_origin, use_container_width=True)
-
-st.header("💰 Average Declared Monthly Revenue by Business Segment")
-
-# Pastikan kolom numerik
-deals["declared_monthly_revenue"] = pd.to_numeric(deals["declared_monthly_revenue"], errors='coerce')
-
-# Ambil unique business segment
-all_segments = deals["business_segment"].dropna().unique()
-all_segments.sort()
-
-# Checklist interaktif di sidebar
-selected_segments = st.sidebar.multiselect(
-    "Pilih Business Segment yang ingin ditampilkan:",
-    options=all_segments,
-    default=list(all_segments)
-)
-
-# Filter data sesuai pilihan
-filtered_deals = deals[deals["business_segment"].isin(selected_segments)]
-
-# Hitung rata-rata revenue
-avg_rev_segment = (
-    filtered_deals.groupby("business_segment")
-    .agg(avg_monthly_revenue=("declared_monthly_revenue", "mean"))
-    .reset_index()
-    .sort_values("avg_monthly_revenue", ascending=False)
-)
-
-# Bar chart
-fig_rev_segment = px.bar(
-    avg_rev_segment,
-    x="avg_monthly_revenue",
-    y="business_segment",
-    orientation="h",
-    title="Average Declared Monthly Revenue by Business Segment (Filtered)",
-    labels={"avg_monthly_revenue": "Avg Declared Revenue", "business_segment": "Business Segment"},
-    text="avg_monthly_revenue",
-    color="avg_monthly_revenue"
-)
-fig_rev_segment.update_traces(texttemplate='Rp %{text:,.0f}', textposition='outside')
-st.plotly_chart(fig_rev_segment, use_container_width=True)
 
 
 st.header("📈 Tren Bulanan: MQL vs Closed Deals")
