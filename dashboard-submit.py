@@ -21,14 +21,15 @@ def load_data():
         products = pd.read_csv(path + "products_dataset.csv")
         order_items = pd.read_csv(path + "order_items_dataset.csv")
         order_reviews = pd.read_csv(path + "order_reviews_dataset.csv")
+        deals = pd.read_csv(path + "closed_deals_dataset.csv", parse_dates=["won_date"])
     except FileNotFoundError as e:
         st.error(f"Error: Salah satu file dataset tidak ditemukan di '{path}'. Pastikan semua file ada.")
         st.stop()
-    return payments, customers, orders, sellers, products, order_items, order_reviews
+    return payments, customers, orders, sellers, products, order_items, order_reviews, deals
 
 
 # Memuat data
-payments, customers, orders, sellers, products, order_items, order_reviews = load_data()
+payments, customers, orders, sellers, products, order_items, order_reviews, deals = load_data()
 
 # --- 2. Judul dan Kalimat Pembuka ---
 st.title("📈 Analisis Kinerja Bisnis E-commerce")
@@ -209,3 +210,41 @@ st.markdown(
 Dari analisis ini, terlihat bahwa preferensi pelanggan sangat dipengaruhi oleh kategori produk tertentu yang berbeda di tiap provinsi. Selain itu, terdapat korelasi antara biaya pengiriman dan kepuasan pelanggan, yang dapat menjadi peluang insentif untuk mendorong konversi dan loyalitas pelanggan.
 """
 )
+
+# ============= Marketing Conversion =====================
+counts = deals['lead_type'].value_counts().sort_values()
+proportions = counts / counts.sum()
+
+# --- Build bar chart ---
+fig = px.bar(
+    x=proportions.values,
+    y=proportions.index,
+    orientation='h',
+    labels={'x': 'Percentage of Leads', 'y': 'Lead Type'},
+    title='Distribusi Lead Type'
+)
+fig.update_traces(
+    text=[f'{p:.1%}' for p in proportions.values],
+    textposition='auto'
+)
+fig.update_layout(
+    xaxis_tickformat='.1%',
+    margin=dict(l=120, r=20, t=50, b=20)
+)
+
+# --- Layout ---
+col1, col2 = st.columns([2, 1])
+
+with col1:
+    st.plotly_chart(fig, use_container_width=True)
+
+with col2:
+    pct = proportions.get('online_medium', 0)
+    pct_str = f'{pct:.1%}'.replace('.', ',')  # e.g. "39,7%"
+
+    st.header('Penjual Online-Medium menjadi kunci pertumbuhan')
+    st.write(
+        f'Dengan {pct_str} penjual berada di online_medium, strategi marketing harus fokus pada '
+        'aktivasi & akselerasi mereka. Dorongan insentif dan kampanye pertumbuhan jadi kunci '
+        'membuka potensi GMV top-tier.'
+    )
