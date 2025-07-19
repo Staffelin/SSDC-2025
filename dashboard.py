@@ -322,6 +322,43 @@ avg_score = rev_cat.groupby("product_category_name_english").review_score.mean()
 fig6 = px.bar(avg_score, x="review_score", y="product_category_name_english", orientation="h", title="Avg Score by Category (Top 10)")
 st.plotly_chart(fig6, use_container_width=True)
 
+counts = deals['lead_type'].value_counts().sort_values()
+proportions = counts / counts.sum()
+
+# --- Build bar chart ---
+fig = px.bar(
+    x=proportions.values,
+    y=proportions.index,
+    orientation='h',
+    labels={'x': 'Percentage of Leads', 'y': 'Lead Type'},
+    title='Distribusi Lead Type'
+)
+fig.update_traces(
+    text=[f'{p:.1%}' for p in proportions.values],
+    textposition='auto'
+)
+fig.update_layout(
+    xaxis_tickformat='.1%',
+    margin=dict(l=120, r=20, t=50, b=20)
+)
+
+# --- Layout ---
+col1, col2 = st.columns([2, 1])
+
+with col1:
+    st.plotly_chart(fig, use_container_width=True)
+
+with col2:
+    pct = proportions.get('online_medium', 0)
+    pct_str = f'{pct:.1%}'.replace('.', ',')  # e.g. "39,7%"
+
+    st.header('Penjual Online-Medium menjadi kunci pertumbuhan')
+    st.write(
+        f'Dengan {pct_str} penjual berada di online_medium, strategi marketing harus fokus pada '
+        'aktivasi & akselerasi mereka. Dorongan insentif dan kampanye pertumbuhan jadi kunci '
+        'membuka potensi GMV top-tier.'
+    )
+
 # Distribusi Origin MQL (Pie Chart)
 st.header("🌐 Distribusi Origin Marketing Qualified Leads")
 origin_dist = mql["origin"].value_counts(normalize=True).mul(100).round(1).reset_index()
