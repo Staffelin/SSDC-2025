@@ -65,47 +65,73 @@ df_analysis = df_analysis.merge(customers[['customer_id', 'customer_state']], on
 # --- 6. High-Level Fulfillment KPIs ---
 st.header("🚚 Overall Fulfillment Performance")
 st.subheader("🎯 Key Performance Indicators (All Categories)")
-col1, col2, col3 = st.columns(3)
-otd_rate = df_analysis['is_on_time'].mean() * 100
-col1.metric("On-Time Delivery (OTD) Rate", f"{otd_rate:.1f}%", help="Percentage of orders delivered to the customer on or before the estimated date.")
-seller_adherence_rate = df_analysis['seller_dispatched_on_time'].mean() * 100
-col2.metric("Seller On-Time Dispatch", f"{seller_adherence_rate:.1f}%", help="Percentage of items shipped by the seller before the required shipping limit date.")
-avg_days_late = df_analysis[~df_analysis['is_on_time']]['days_late'].mean()
-col3.metric("Average Customer Days Late", f"{avg_days_late:.1f} days", help="The average delay for orders that were not delivered on time.")
+col1, col2, col3, col4 = st.columns(4)
+late_rate = (~df_analysis['is_on_time']).mean() * 100
+col1.metric("Late Delivery Rate", f"{late_rate:.1f}%", help="Persentase pesanan yang diterima pelanggan setelah estimasi tanggal pengiriman (semakin rendah semakin baik).")
+
+seller_late_rate = (~df_analysis['seller_dispatched_on_time']).mean() * 100
+col2.metric("Late Seller Dispatch", f"{seller_late_rate:.1f}%", help="Persentase item yang dikirim seller setelah batas waktu pengiriman ke ekspedisi.")
+
+avg_days_late = df_analysis.loc[~df_analysis['is_on_time'], 'days_late'].mean()
+col3.metric("Rata-rata Hari Keterlambatan", f"{avg_days_late:.1f} hari", help="Rata-rata keterlambatan pengiriman yang tidak on-time (semakin kecil semakin baik).")
+
+late_orders_count = (~df_analysis['is_on_time']).sum()
+col4.metric("Jumlah Delivery Terlambat", f"{late_orders_count:,}", help="Total pesanan yang terlambat dari seluruh pengiriman delivered.")
+
 
 # --- NEW: OTD and Seller Dispatch Rate Trend Over Time ---
 st.subheader("📊 Performance Trend Over Time")
 df_analysis['month'] = df_analysis['order_purchase_timestamp'].dt.to_period('M').dt.to_timestamp()
 monthly_performance = df_analysis.groupby('month').agg(
-    customer_otd_rate=('is_on_time', 'mean'),
-    seller_dispatch_rate=('seller_dispatched_on_time', 'mean')
+    customer_late_rate = ('is_on_time', lambda x: (~x).mean() * 100),
+    seller_late_rate = ('seller_dispatched_on_time', lambda x: (~x).mean() * 100)
 ).reset_index()
-monthly_performance[['customer_otd_rate', 'seller_dispatch_rate']] *= 100
 
+# Filter hanya order yang telat (days_late > 0)
+late_orders = df_analysis[df_analysis['days_late'] > 0].copy()
+late_orders['month'] = late_orders['order_purchase_timestamp'].dt.to_period('M').dt.to_timestamp()
+
+# Group by bulan
+monthly_days_late = late_orders.groupby('month')['days_late'].mean().reset_index()
+
+import plotly.express as px
+
+fig_dayslate_trend = px.line(
+    monthly_days_late,
+    x='month',
+    y='days_late',
+    markers=True,
+    title="Tren Rata-rata Hari Keterlambatan per Bulan"
+)
+fig_dayslate_trend.update_layout(
+    yaxis_title="Rata-rata Hari Terlambat",
+    xaxis_title="Bulan"
+)
+st.plotly_chart(fig_dayslate_trend, use_container_width=True)
+# --- 6.1 KPI Metrics for Total Sellers and Products ---
 # Melt the dataframe to plot both lines
-monthly_performance_melted = monthly_performance.melt(
+monthly_late_melted = monthly_performance.melt(
     id_vars='month',
-    value_vars=['customer_otd_rate', 'seller_dispatch_rate'],
+    value_vars=['customer_late_rate', 'seller_late_rate'],
     var_name='metric_type',
     value_name='rate'
 )
-# Rename for clarity in the legend
 rename_map = {
-    'customer_otd_rate': 'Customer On-Time Rate',
-    'seller_dispatch_rate': 'Seller On-Time Dispatch'
+    'customer_late_rate': 'Customer Late Delivery Rate',
+    'seller_late_rate': 'Seller Late Dispatch Rate'
 }
-monthly_performance_melted['metric_type'] = monthly_performance_melted['metric_type'].map(rename_map)
+monthly_late_melted['metric_type'] = monthly_late_melted['metric_type'].map(rename_map)
 
-fig_otd_trend = px.line(
-    monthly_performance_melted, 
-    x='month', 
-    y='rate', 
-    color='metric_type',
-    title="Monthly Performance Rate (%)", 
+fig_late_trend = px.line(
+    monthly_late_melted,
+    x='month', y='rate', color='metric_type',
+    title="Tren Late Rate (Pengiriman & Dispatch) Bulanan",
     markers=True
 )
-fig_otd_trend.update_layout(yaxis_title="Rate (%)", xaxis_title="Month", legend_title_text='Metric')
-st.plotly_chart(fig_otd_trend, use_container_width=True)
+fig_late_trend.update_layout(
+    yaxis_title="Late Rate (%)", xaxis_title="Bulan", legend_title_text='Metric'
+)
+st.plotly_chart(fig_late_trend, use_container_width=True)
 st.markdown("---")
 
 # --- 7. Interactive Regional and Product Analysis ---
@@ -152,17 +178,39 @@ with col2:
     if map_metric_selection == "Customer On-Time Rate":
         late_data = state_filtered_data[~state_filtered_data['is_on_time']].copy()
         if not late_data.empty:
-            bins = list(np.arange(0, 61, 5)) + [np.inf]
-            labels = [f"{i} - {i+5}" for i in np.arange(0, 60, 5)] + ["60+"]
-            late_data['lateness_bin'] = pd.cut(late_data['days_late'], bins=bins, labels=labels, right=False)
-            binned_counts = late_data['lateness_bin'].value_counts().sort_index().reset_index()
-            binned_counts.columns = ['lateness_bin', 'count']
-            
-            fig_dist = px.bar(binned_counts, x='lateness_bin', y='count', text_auto=True, title=f'Distribution of Customer Lateness {category_title}{state_title}')
-            fig_dist.update_layout(yaxis_title="Count of Late Orders", xaxis_title='Customer Days Late (Binned)', xaxis={'categoryorder':'array', 'categoryarray': labels})
-            st.plotly_chart(fig_dist, use_container_width=True)
+            # Set bin width 1 hari, range 0 - 16 (atau sesuai distribusi data)
+            bins = [0, 3, 6, 9, 12, 15, np.inf]
+            labels = ["0-2", "3-5", "6-8", "9-11", "12-14", "15+"]
+
+            late_data['days_late_bin'] = pd.cut(
+                late_data['days_late'],
+                bins=bins,
+                labels=labels,
+                right=False,      # bin [start, end)
+                include_lowest=True
+            )
+
+            # Agregasi
+            binned_counts = late_data['days_late_bin'].value_counts().reindex(labels, fill_value=0).reset_index()
+            binned_counts.columns = ['days_late_bin', 'count']
+
+            fig_bar = px.bar(
+                binned_counts, 
+                x='days_late_bin', 
+                y='count', 
+                text_auto=True,
+                title=f"Distribusi Hari Keterlambatan (Interval 3 Hari, '15+' Digabung) {category_title}{state_title}",
+                labels={'days_late_bin': 'Rentang Hari Keterlambatan', 'count': 'Jumlah Order Terlambat'}
+            )
+            fig_bar.update_layout(
+                bargap=0.25,
+                yaxis_title="Jumlah Order Terlambat",
+                xaxis_title="Hari Keterlambatan (Binned)"
+            )
+            st.plotly_chart(fig_bar, use_container_width=True)
         else:
-            st.info("No late customer deliveries to display for the selected criteria.")
+            st.info("Tidak ada data keterlambatan pada kriteria ini.")
+
             
     else: # Seller On-Time Dispatch Rate
         late_data = state_filtered_data[~state_filtered_data['seller_dispatched_on_time']].copy()
@@ -180,22 +228,35 @@ with col2:
             st.info("No late seller dispatches to display for the selected criteria.")
 st.markdown("---")
 
-# --- NEW: Plot for the most frequently late product categories ---
-st.header("Problematic Product Categories")
-st.subheader("Top 5 Most Frequently Late Product Categories")
-if not df_analysis[~df_analysis['is_on_time']].empty:
-    late_categories = df_analysis[~df_analysis['is_on_time']]['product_category_name_english'].value_counts().nlargest(5).reset_index()
-    late_categories.columns = ['product_category', 'count_of_late_orders']
-    
-    fig_late_cats = px.bar(
-        late_categories, 
-        x='count_of_late_orders', 
-        y='product_category',
-        orientation='h', 
-        title="Top 5 Product Categories with the Most Late Orders",
-        text_auto=True
-    )
-    fig_late_cats.update_layout(yaxis={'categoryorder':'total ascending'}, xaxis_title='Number of Late Orders', yaxis_title='Product Category')
-    st.plotly_chart(fig_late_cats, use_container_width=True)
-else:
-    st.info("No late orders found.")
+# Proses: Jam, agar mudah dibandingkan
+df_analysis['order_processing_time'] = (df_analysis['order_approved_at'] - df_analysis['order_purchase_timestamp']).dt.total_seconds() / 3600
+df_analysis['seller_lead_time'] = (df_analysis['order_delivered_carrier_date'] - df_analysis['order_approved_at']).dt.total_seconds() / 3600
+df_analysis['shipping_time'] = (df_analysis['order_delivered_customer_date'] - df_analysis['order_delivered_carrier_date']).dt.total_seconds() / 3600
+
+df_time_filtered = df_analysis.copy()
+if selected_state != 'All States':
+    df_time_filtered = df_time_filtered[df_time_filtered['customer_state'] == selected_state]
+
+avg_processing = df_time_filtered['order_processing_time'].mean()
+avg_seller_lead = df_time_filtered['seller_lead_time'].mean()
+avg_shipping = df_time_filtered['shipping_time'].mean()
+
+labels = ['Order Processing', 'Seller to Carrier', 'Carrier to Customer']
+values = [avg_processing, avg_seller_lead, avg_shipping]
+percentages = [v / sum(values) * 100 for v in values]
+
+import plotly.graph_objects as go
+
+fig_avg = go.Figure(go.Bar(
+    x=labels,
+    y=values,
+    text=[f"{v:.1f} jam<br>({p:.1f}%)" for v, p in zip(values, percentages)],
+    textposition='auto',
+    marker_color=['#4e79a7', '#f28e2c', '#e15759']
+))
+fig_avg.update_layout(
+    title=f"Rata-rata Breakdown Waktu Pengiriman ({selected_state})",
+    yaxis_title="Rata-rata Waktu (jam)",
+    xaxis_title="Proses"
+)
+st.plotly_chart(fig_avg, use_container_width=True)
