@@ -5,8 +5,8 @@ import time
 
 # --- Configuration ---
 REVIEWS_FILE_PATH = "E-commerce/order_reviews_dataset.csv"
-NUM_TOPICS = 10  # The number of complaint categories we want to find
-TOP_WORDS_PER_TOPIC = 25 # The number of keywords to show for each category
+NUM_TOPICS = 4  # The number of complaint categories we want to find
+TOP_WORDS_PER_TOPIC = 10 # The number of keywords to show for each category
 
 def run_topic_modeling():
     """
