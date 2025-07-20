@@ -3,6 +3,12 @@ import pandas as pd
 import plotly.express as px
 import numpy as np
 import plotly.graph_objects as go
+import os
+
+path = os.path.join(os.getcwd(), "E-commerce", "order_payments_dataset.csv")
+print("Absolute path:", path)
+print("File exists?", os.path.isfile(path))
+
 
 st.set_page_config(
     page_title="Analisis Kinerja E-commerce",
