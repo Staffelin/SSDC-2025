@@ -83,7 +83,7 @@ st.markdown("---")
 
 st.header("Apa yang Pelanggan Katakan Tentang Produk Kita?")
 st.markdown("*Rating* yang diberikan oleh pelanggan dapat dipengaruhi oleh berbagai faktor, seperti keterlambatan, barang yang tidak sampai, ataupun cacat produk. Faktor ini dapat menurunkan kepercayaan pelanggan terhadap platform secara keseluruhan dan mengurangi *repeat order* pada kategori yang sama.")
-st.subheader("Apa Kategori Produk yang Paling Disukai/Dibenci Pelanggan?")
+st.subheader("Apa Kategori Produk yang Paling Disukai/Tidak Disukai Pelanggan?")
 min_reviews = st.slider("Jumlah minimum ulasan untuk ditampilkan:", min_value=10, max_value=200, value=50)
 category_quality = df_master.groupby('product_category_name_english').agg(average_score=('review_score', 'mean'), review_count=('review_score', 'count')).reset_index()
 category_quality_filtered = category_quality[category_quality['review_count'] >= min_reviews]
@@ -104,41 +104,52 @@ with col2:
 st.subheader("Kualitas Pengiriman Menurukan Kepercayaan")
 st.markdown("Ketidakmampuan memenuhi janji pengiriman telah menjadi sumber utama ketidakpuasan pelanggan. Selama titik ini belum diperbaiki, pertumbuhan akuisisi hanya akan diimbangi oleh hilangnya pelanggan lama.")
 complaint_keywords = {
-    "Late Delivery": ["atras", "demor", "prazo", "lento", "extravia", "nao chegou"],
-    "Product Not Received": ["não recebi", "nao recebi", "não entregue", "nao entregue", "nunca chegou", "consta entregue", "caixa vazia"],
-    "Missing Items / Partial Delivery": ["falt", "incompleto", "apenas", "só", "parte", "unidade", "kit", "parcial", "quantitade", "somen"],
-    "Bad Product Quality / Defective": ["quebra", "defeit", "qualidade ruim", "funciona", "estraga", "avaria", "falso", "caixa", "rasga", "mancha", "costura", "acabamento", "arranha", "amassad", "solto", "velh"],
-    "Wrong Item Sent": ["diferente", "erra", "outro", "modelo", "cor ", "trocado", "marca", "tamanho"],
+    "Late Delivery": ["atras", "demor", "prazo", "lento", "extravia", "pass"],
+    "Missing Items / Partial Delivery": ["falt", "incompleto", "apenas", "só", " so ", "parte", "unidade", "kit", "parcial", "quantitade", "somen"],
+    "Product Not Received": ["nao chegou", "não chegou", "não rece", "nao rece", "não entreg", "nao entreg", "nunca chegou", "consta entregue", "caixa vazia", "aguard", "nada", "nao foi entreg", "não foi entreg"],
+    "Bad Product Quality / Defective": ["peq", "quebra", "defeit", "qualidade ruim", "funciona", "estraga", "avaria", "falso", "caixa", "rasga", "mancha", "costura", "acabamento", "arranha", "amassad", "solto", "velh", "fraco", "materi", "fals"],
+    "Wrong Item Sent": ["diferente", "erra", "outro", "modelo", "cor ", "trocado", "marca", "tamanho", "correspondem", "nao foi o mesm", "não foi o mesm"],
     "Bad Packaging": ["caixa", "embala", "rasgad", "abert", "violad", "frágil", "fragil", "danificad", "pacote"],
-    "Bad Service / Seller Issues": ["atendimento", "sem resposta", "ninguem responde", "não resolve", "pós venda", "mau vendedor", "sem retorno", "diálogo", "serviço", "servico"],
+    "Bad Service / Seller Issues": ["atendimen", "sem resp", "ninguem resp", "nao resol", "não resolve", "pós venda", "vendedor", "dialo", "diálo", "serviç", "servic", "respe", "loj"],
+    "Misleading Product / Advertisement": ["propagan", "anunc", "fot", "descri", "expect", "ilus", "nao e como", "não é como", "origin"],
     # "Return & Refund Issues": ["devolv", "troca", "dinheiro", "volta", "cancel", "reembolso", "estorno"],
+    "Return / Refund / Cancellation Issues": ["cancel", "devol", "troca"]
 }
 
 def categorize_complaint(comment):
-    if not isinstance(comment, str): return "Lainnya"
+    if not isinstance(comment, str): return "Unclassified"
     comment_lower = comment.lower()
     scores = {category: sum(1 for keyword in keywords if keyword in comment_lower) for category, keywords in complaint_keywords.items()}
     max_score = max(scores.values())
-    if max_score == 0: return "Lainnya"
+    if max_score == 0: return "Unclassified"
     best_category = [category for category, score in scores.items() if score == max_score][0]
     return best_category
 
-# Siapkan data ulasan negatif
 df_neg_reviews = df_master.dropna(subset=['review_comment_message', 'review_comment_message_en', 'review_id'])
-
-# <-- FIX: Hapus duplikat berdasarkan review_id untuk memastikan setiap ulasan unik -->
 df_neg_reviews = df_neg_reviews.drop_duplicates(subset=['review_id'])
+low_score_reviews_all = df_neg_reviews[df_neg_reviews['review_score'] <= 2].copy()
+low_score_reviews_all['complaint_category'] = low_score_reviews_all['review_comment_message'].apply(categorize_complaint)
 
-low_score_reviews = df_neg_reviews[df_neg_reviews['review_score'] <= 2].copy()
-low_score_reviews['complaint_category'] = low_score_reviews['review_comment_message'].apply(categorize_complaint)
+category_filter_list = ['Semua Kategori'] + sorted(df_neg_reviews['product_category_name_english'].dropna().unique().tolist())
+selected_prod_category = st.selectbox(
+    "Pilih Kategori Produk untuk dianalisis:",
+    options=category_filter_list
+)
+
+if selected_prod_category != 'Semua Kategori':
+    low_score_reviews = low_score_reviews_all[low_score_reviews_all['product_category_name_english'] == selected_prod_category]
+else:
+    low_score_reviews = low_score_reviews_all
 
 col1, col2 = st.columns(2)
 with col1:
-    st.markdown("##### Kategori Keluhan Utama")
-    category_counts = low_score_reviews['complaint_category'].value_counts().reset_index()
-    fig_complaints = px.bar(category_counts, x='count', y='complaint_category', orientation='h', text_auto=True, color_discrete_sequence=[THEME_COLOR], template=PLOTLY_TEMPLATE)
-    fig_complaints.update_layout(yaxis={'categoryorder':'total ascending'}, xaxis_title="Jumlah Ulasan Negatif", yaxis_title="Kategori Keluhan")
-    st.plotly_chart(fig_complaints, use_container_width=True)
+    if not low_score_reviews.empty:
+        category_counts = low_score_reviews['complaint_category'].value_counts().reset_index()
+        fig_complaints = px.bar(category_counts, x='count', y='complaint_category', orientation='h', text_auto=True, color_discrete_sequence=[THEME_COLOR], template=PLOTLY_TEMPLATE)
+        fig_complaints.update_layout(yaxis={'categoryorder':'total ascending'}, xaxis_title="Jumlah Ulasan Negatif", yaxis_title="Kategori Keluhan")
+        st.plotly_chart(fig_complaints, use_container_width=True)
+    else:
+        st.info("Tidak ada ulasan negatif untuk kategori yang dipilih.")
 with col2:
     st.markdown("##### Contoh Komentar Ulasan (dalam Bahasa Inggris)")
     if not low_score_reviews.empty:
@@ -146,7 +157,6 @@ with col2:
         selected_complaint = st.selectbox("Pilih kategori keluhan untuk melihat contoh:", options=complaint_category_list)
         
         sample_comments = low_score_reviews[low_score_reviews['complaint_category'] == selected_complaint]
-        # Tampilkan hingga 50 sampel unik
         st.dataframe(sample_comments[['review_score', 'review_comment_message_en', 'review_comment_message']].head(50))
     else:
         st.info("Tidak ada komentar untuk ditampilkan.")
