@@ -1,0 +1,65 @@
+# .streamlit/config.toml
+
+[server]
+# Port for the Streamlit server to listen on.
+# Default: 8501
+# port = 8501
+
+# Address for the Streamlit server to listen on.
+# Default: 0.0.0.0 (listens on all available network interfaces)
+# Use 127.0.0.1 for local access only.
+# address = "0.0.0.0"
+
+# Boolean. Run in development mode.
+# Default: false
+# In development mode, changes to Python files are automatically reloaded.
+# Enable this for local development, disable for production deployments.
+# enableCORS = true # Only enable if you know what you're doing and need cross-origin access
+# enableXsrfProtection = true # Only enable if you know what you're doing
+
+[browser]
+# Boolean. Whether to open the browser automatically when the server starts.
+# Default: true
+gatherUsageStats = false
+
+[global]
+# Boolean. Show a warning when you run a Streamlit command in a non-root directory.
+# Default: false
+# suppressReportTree = false
+
+[client]
+# Boolean. Whether to show the "Connect to an external service" banner.
+# Default: true
+# showErrorDetails = true
+
+[logger]
+# The level of logging to display.
+# Options: "info", "warning", "error", "debug"
+# Default: "info"
+level = "info"
+
+# Path to the log file.
+# Default: null (logs to stderr)
+# file = "/var/log/streamlit/streamlit.log"
+
+[theme]
+# Primary accent color for your app.
+# Default: "#FF4B4B"
+primaryColor = "#F63366"
+
+# Background color for the main content area.
+# Default: "#FFFFFF" (light theme) or "#0E1117" (dark theme)
+backgroundColor = "#FFFFFF"
+
+# Background color for sidebars and other interactive elements.
+# Default: "#F0F2F6" (light theme) or "#1F232B" (dark theme)
+secondaryBackgroundColor = "#F0F2F6"
+
+# Color of the text in your app.
+# Default: "#262730" (light theme) or "#FAFAFA" (dark theme)
+textColor = "#262730"
+
+# Font family for your app.
+# Options: "sans serif", "serif", "monospace"
+# Default: "sans serif"
+font = "sans serif"
