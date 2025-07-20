@@ -215,9 +215,6 @@ items = items.merge(cat_trans, on="product_category_name", how="left")
 
 items['product_category_name_english'] = items['product_category_name_english'].dropna().apply(format_snake_case)
 
-st.set_page_config(page_title="E-commerce Operational Dashboard", layout="wide")
-st.title("📈 E-commerce Operational Dashboard")
-
 df_analysis = orders.merge(items, on="order_id", how="left")
 df_analysis = df_analysis[df_analysis['order_status'] == 'delivered'].dropna(
     subset=[
@@ -260,26 +257,6 @@ late_orders['month'] = late_orders['order_purchase_timestamp'].dt.to_period('M')
 
 monthly_days_late = late_orders.groupby('month')['days_late'].mean().reset_index()
 
-import plotly.express as px
-
-fig_dayslate_trend = px.line(
-    monthly_days_late,
-    x='month',
-    y='days_late',
-    markers=True,
-    title="Tren Rata-rata Hari Keterlambatan per Bulan"
-)
-fig_dayslate_trend.update_layout(
-    yaxis_title="Rata-rata Hari Terlambat",
-    xaxis_title="Bulan"
-)
-st.plotly_chart(fig_dayslate_trend, use_container_width=True)
-st.markdown("---")
-
-# --- 7. Interactive Regional and Product Analysis ---
-st.header("Wilayah Berkinerja Buruk Menjadi Beban Pertumbuhan")
-st.markdown("Provinsi dengan tingkat pengiriman rendah secara langsung menurunkan performa rata-rata nasional. Tanpa prioritas perbaikan di area ini, ekspansi hanya akan menambah volume masalah, bukan nilai bisnis.")
-
 col1, col2 = st.columns(2)
 with col1:
     st.subheader("Angka Keterlambatan Masih Tinggi...")
@@ -314,7 +291,7 @@ with col2:
 
 st.markdown("Terdapat **8.568 pengiriman terlambat** dalam rentang waktu **dua tahun**. Artinya terdapat **3657 pengiriman yang terlambat setiap bulan**.")
 
-st.header("Masalah Keterlambatan Terdiri dari Beberapa Aspek")
+st.subheader("Masalah Keterlambatan Terdiri dari Beberapa Aspek")
 st.markdown("Terdapat ketidakmerataan angka keterlambatan di beberapa provinsi. Selain itu, distribusi lama keterlambatan juga memberikan pola unik.")
 
 control_col1, control_col2, control_col3 = st.columns(3)
@@ -322,7 +299,7 @@ control_col1, control_col2, control_col3 = st.columns(3)
 with control_col1:
     map_metric_selection = st.radio(
         "Pilih Metrik Peta:",
-        options=["Customer On-Time Rate", "Seller Late Dispatch Rate"],
+        options=["Customer Lateness Rate", "Seller Late Dispatch Rate"],
         horizontal=True,
         key="map_metric_selector"
     )
@@ -350,10 +327,10 @@ with control_col2:
 main_col1, main_col2 = st.columns([1, 2])
 
 with main_col1:
-    map_title_prefix = "Customer Lateness Rate" if map_metric_selection == "Customer On-Time Rate" else "Seller Late Dispatch Rate"
-    st.markdown(f"##### {map_title_prefix} (%) per Provinsi")
+    map_title_prefix = "Customer Lateness Rate" if map_metric_selection == "Customer Lateness Rate" else "Seller Late Dispatch Rate"
+    st.subheader(f"{map_title_prefix} (%) per Provinsi")
     
-    if map_metric_selection == "Customer On-Time Rate":
+    if map_metric_selection == "Customer Lateness Rate":
         metric_by_state = df_regional.groupby('customer_state')['is_on_time'].apply(lambda x: (~x).mean() * 100).reset_index(name='metric_value')
         map_title = "Customer Lateness Rate (%)"
     else:
@@ -404,7 +381,7 @@ with main_col2:
         else:
             st.info("Tidak ada data keterlambatan pelanggan pada kriteria ini.")
     else:
-        st.markdown("Mayoritas Keterlambatan Penjual Hanya Beberapa Hari")
+        st.subheader("Mayoritas Keterlambatan Penjual Hanya Beberapa Hari")
         late_data = state_filtered_data[~state_filtered_data['seller_dispatched_on_time']].copy()
         if not late_data.empty:
             bins = list(np.arange(0, 16, 3)) + [np.inf]
