@@ -4,7 +4,6 @@ import plotly.express as px
 import numpy as np
 import plotly.graph_objects as go
 
-
 # --- 1. Konfigurasi dan Pemuatan Data ---
 st.set_page_config(
     page_title="Analisis Kinerja E-commerce",
@@ -472,8 +471,6 @@ labels = ['Order Processing', 'Seller to Carrier', 'Carrier to Customer']
 values = [avg_processing, avg_seller_lead, avg_shipping]
 percentages = [v / sum(values) * 100 for v in values]
 
-import plotly.graph_objects as go
-
 fig_avg = go.Figure(go.Bar(
     x=labels,
     y=values,
@@ -490,6 +487,69 @@ fig_avg.update_layout(
     xaxis_title="Proses"
 )
 st.plotly_chart(fig_avg, use_container_width=True)
+
+# --- Analisis Biaya Pengiriman (Ongkir) dan Dampaknya ---
+st.header("🚢 Analisis Biaya Pengiriman (Ongkir) dan Dampaknya")
+st.markdown(
+    "Analisis ini menggali dua temuan utama: tingginya biaya pengiriman relatif terhadap harga produk di beberapa kategori, dan dampak negatifnya terhadap skor ulasan pelanggan."
+)
+
+# Siapkan data untuk analisis ini, pastikan tidak ada nilai yang hilang
+df_freight_analysis = df_master.dropna(subset=['freight_value', 'price', 'review_score', 'product_category_name_english'])
+
+col1, col2 = st.columns(2)
+
+with col1:
+    # --- KIRI: Menampilkan Rasio Ongkir Median ---
+    st.markdown("**Rasio Ongkos Kirim Terhadap Harga Produk (Median)**")
+    
+    # <-- MODIFIKASI: Menghitung nilai median, bukan total (sum) -->
+    # Hitung nilai median ongkir dan harga dari semua produk yang relevan
+    median_freight_value = df_freight_analysis['freight_value'].median()
+    median_price_value = df_freight_analysis['price'].median()
+    
+    # Hitung persentase berdasarkan nilai median
+    if median_price_value > 0:
+        median_freight_percentage = (median_freight_value / median_price_value) * 100
+    else:
+        median_freight_percentage = 0
+        
+    # Tampilkan sebagai KPI
+    st.metric(
+        label="Rasio Ongkir Median (dari Harga Median)",
+        value=f"{median_freight_percentage:.2f}%",
+        help="Biaya pengiriman median dibagi dengan harga produk median. Ini mewakili biaya kirim untuk produk 'tipikal'."
+    )
+    
+    st.info(
+        "Metrik berbasis median ini memberikan gambaran biaya kirim yang lebih representatif "
+        "untuk produk pada umumnya, karena tidak terlalu dipengaruhi oleh produk yang sangat mahal atau sangat murah."
+    )
+
+with col2:
+    # --- KANAN: Analisis Dampak Masalah (Ongkir vs. Skor Ulasan) ---
+    st.markdown("**Dampak Ongkos Kirim terhadap Skor Ulasan**")
+    
+    # Buat kelompok (bin) untuk ongkos kirim
+    bins = [0, 10, 20, 30, 45, float('inf')]
+    labels = ["0-10", "10-20", "20-30", "30-45", "45+"]
+    df_freight_analysis['freight_bin'] = pd.cut(df_freight_analysis['freight_value'], bins=bins, labels=labels, right=False)
+    
+    # Hitung skor rata-rata untuk setiap kelompok ongkir
+    review_by_freight = df_freight_analysis.groupby('freight_bin')['review_score'].mean().reset_index().dropna()
+    
+    fig_review_freight = px.bar(
+        review_by_freight, 
+        x='freight_bin', 
+        y='review_score',
+        text=review_by_freight['review_score'].round(2),
+        title="Skor Ulasan Rata-rata Cenderung Menurun Saat Ongkir Naik",
+        labels={'freight_bin': 'Kelompok Ongkos Kirim (R$)', 'review_score': 'Skor Ulasan Rata-rata'},
+        color_discrete_sequence=['#d62728'], # Warna merah untuk menyorot dampak negatif
+        template=PLOTLY_TEMPLATE
+    )
+    fig_review_freight.update_layout(yaxis=dict(range=[3.5, 5]))
+    st.plotly_chart(fig_review_freight, use_container_width=True)
 
 # --- 6. Analisis Potensi Perluasan Pasar ---
 st.markdown("---")
