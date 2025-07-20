@@ -49,7 +49,7 @@ df_master['product_category_name_english'] = df_master['product_category_name_en
 
 st.title("Scalability Through Continuity")
 st.markdown("Made by Astutea - SSDC2025006")
-st.markdown(" E-Commerce telah mencapai skala yang mengesankan dengan hampir 100.000 pesanan dan 96.000 pelanggan, menandakan fondasi operasional yang solid. Namun pertumbuhan pendapatan menunjukkan tanda-tanda stagnasi dan belum diimbangi oleh kualitas pengiriman, relevansi produk, serta keseimbangan penawaran seller. Dashboard ini mengungkap area strategis yang harus diperbaiki untuk mendorong pertumbuhan berkelanjutan. Fokus diarahkan pada penyelarasan preferensi pelanggan dan inventori, akselerasi seller potensial, serta optimalisasi logistik agar perusahaan tidak hanya besar, tapi juga tangguh dan relevan di tengah dinamika pasar yang kompetitif")
+st.markdown(" E-Commerce telah mencapai skala yang besar dalam waktu yang pesat, dengan hampir 100.000 pesanan dan 96.000 pelanggan dalam 2 tahun. Namun, pertumbuhan pendapatan menunjukkan **tanda-tanda stagnasi** dan perusahaan masih memiliki banyak **permasalahan dalam segi kualitas pengiriman, relevansi produk, serta kerataan penjual**. *Dashboard* ini mengungkap area strategis yang harus diperbaiki untuk mendorong pertumbuhan berkelanjutan. Fokus pembahasan diarahkan pada **memahami preferensi pelanggan dan inventori, optimasi logistik, dan pertumbuhan pasar yang akurat**. Diharapkan agar strategi yang diusulkan pada *dashboard* ini dapat menjadi perintis dalam memutarkan kembali roda pertumbuhan perusahaan.")
 st.markdown("---")
 
 st.header("Perusahaan Sudah Berkembang Pesat, Akankah Terus Seperti Ini?")
@@ -188,6 +188,10 @@ st.caption("**Disclaimer**: Ulasan ini dikategorikan secara otomatis dengan menc
 
 st.markdown("Ketidakpastian atas pengiriman produk, seperti **pengiriman yang tidak tepat waktu**, **barang tidak lengkap**, bahkan **barang yang sama sekali tidak sampai pengirim** merupakan faktor utama penyebab ulasan rendah. Hal yang sama berlaku untuk beberapa kategori produk dengan ulasan rendah (Office Furniture, Fixed Telephony).")
 st.markdown("Kategori produk lain memiliki keluhan yang lebih **spesifik terhadap kategorinya**, misalnya Fashion Male Clothing yang memiliki banyak masalah tentang **salah pengiriman** dan **refund** (contohnya masalah ukuran yang tidak cocok).")
+
+st.markdown("""
+Berdasarkan keluhan yang paling sering dialami, rekomendasi yang kami dapat berikan adalah penerapan **Service Level Agreement (SLA)**. SLA adalah kontrak antara penyedia dan pelanggan untuk mendefinisikan standar pelayanan yang dapat diekspektasikan pelanggan kepada penyedia. SLA berfungsi untuk memberikan jaminan bahwa tidak ada produk yang **telat diantar/tidak diterima**. Ini dilakukan dengan mendefinisikan **deadline** yang jelas untuk pengiriman, memberi **sanksi** kepada penyedia jika gagal memenuhi kontrak, serta memberikan **reimbursement** kepada pelanggan.
+""")
 
 st.markdown("---")
 
@@ -439,7 +443,11 @@ fig_avg.update_layout(
 )
 st.plotly_chart(fig_avg, use_container_width=True)
 
-st.markdown("---")
+st.markdown("Untuk mengatasi masalah **ketidakmerataan keterlambatan secara regional**, strategi yang kami usulkan adalah bekerja sama dengan **mitra regional** serta memberikan **insentif** untuk kurir yang ingin mengantar ke daerah tersebut.")
+
+st.markdown("Untuk mengatasi masalah **keterlambatan sebanyak 15+ hari**, strategi yang kami usulkan mirip dengan sebelumnya, yaitu menggunakan **SLA** untuk **meningkatkan jaminan tepat waktu**.")
+
+st.markdown("Untuk mengatasi masalah waktu pengiriman **Carrier to Customer** yang lama, strategi yang kami usulkan adalah **penetapan SLA, penambahan *sorting hub* di setiap *state*, serta diversifikasi opsi kurir**.")
 
 st.header("Secara Diam-diam, Mahalnya Ongkir Membuat Pelanggan Tidak Senang")
 st.markdown("Ternyata, biaya pengiriman pada platform ini sangat tinggi dan berdampak negatif terhadap nilai ulasan pelanggan.")
@@ -487,56 +495,21 @@ with col2:
     fig_review_freight.update_layout(yaxis=dict(range=[3.5, 5]))
     st.plotly_chart(fig_review_freight, use_container_width=True)
 
-st.header("Permintaan Terdistribusi Tidak Merata di Setiap Wilayah")
-st.markdown("Data menunjukkan konsentrasi kategori populer berbeda signifikan antar provinsi. Tanpa pendekatan berbasis wilayah dalam pengelolaan inventori dan promosi, ketidaksesuaian antara penawaran dan permintaan lokal akan terus menghambat pertumbuhan penjualan regional secara optimal.")
+st.markdown("Untuk mengatasi masalah ini, strategi yang kami usulkan adalah **memberikan promosi** untuk pesanan dengan harga ongkir tinggi serta **negosiasi biaya** dengan kurir untuk menekan biaya.")
 
-df_popular = df_master.dropna(subset=['product_category_name_english', 'customer_state'])
+st.markdown("---")
 
-provinsi_list = ['Semua Provinsi'] + sorted(df_popular['customer_state'].unique().tolist())
-selected_state = st.selectbox("Pilih Wilayah Analisis:", provinsi_list)
+st.header("Apa yang Dapat Kita Lakukan untuk Memperluas Pasar Kita?")
 
-col1, col2 = st.columns([1, 2])
+col1, col2 = st.columns(2)
 
 with col1:
-    map_title = "Peta Pesanan Nasional" if selected_state == 'Semua Provinsi' else f"Lokasi Provinsi: {selected_state}"
-    st.markdown(f"**{map_title}**")
-    state_order_counts = df_popular['customer_state'].value_counts().reset_index()
-    state_order_counts.columns = ['state', 'orders']
+    st.subheader("Top 10 Kategori Produk Berdasarkan Jumlah Pesanan")
     
-    geojson_url = "https://raw.githubusercontent.com/codeforgermany/click_that_hood/main/public/data/brazil-states.geojson"
-    
-    fig_map = px.choropleth(
-        state_order_counts,
-        geojson=geojson_url,
-        locations='state',
-        featureidkey='properties.sigla',
-        color='orders',
-        color_continuous_scale="Blues",
-        scope="south america"
-    )
-    if selected_state == 'Semua Provinsi':
-        fig_map.update_geos(fitbounds="geojson", visible=False)
-    else:
-        fig_map.update_geos(fitbounds="locations", visible=False)
-        fig_map.data[0].locations = [selected_state]
-
-    fig_map.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
-    st.plotly_chart(fig_map, use_container_width=True)
-
-with col2:
-    if selected_state == 'Semua Provinsi':
-        st.markdown("**Top 10 Kategori Produk (Nasional)**")
-        top_cats_data = df_popular['product_category_name_english'].value_counts().head(10).reset_index()
-    else:
-        st.markdown(f"**Top 10 Kategori Produk di Provinsi {selected_state}**")
-        top_cats_data = (
-            df_popular[df_popular['customer_state'] == selected_state]
-            ['product_category_name_english']
-            .value_counts()
-            .head(10)
-            .reset_index()
-        )
+    df_popular = df_master.dropna(subset=['product_category_name_english'])
+    top_cats_data = df_popular['product_category_name_english'].value_counts().head(10).reset_index()
     top_cats_data.columns = ['Kategori', 'Jumlah Pesanan']
+    
     fig_top_cats = px.bar(
         top_cats_data,
         x='Jumlah Pesanan',
@@ -554,33 +527,23 @@ with col2:
     )
     st.plotly_chart(fig_top_cats, use_container_width=True)
 
-with col1:
-    st.subheader("Kesempatan dalam Kesenjangan")
-    st.markdown("Seller banyak berasal dari segmen seperti home decor dan health beauty, namun data pembelian menunjukkan preferensi konsumen yang jauh lebih beragam. Ketimpangan ini menjadi sinyal untuk menyelaraskan pasokan dengan permintaan agar potensi pertumbuhan tidak terhambat oleh ketidaksesuaian antara ekosistem penjual dan kebutuhan pasar.")
 with col2:
+    st.subheader("Top 10 Segmen Bisnis Penjual")
+
     deals_with_state = deals.merge(
         sellers[['seller_id', 'seller_state']], on='seller_id', how='left'
     )
-
-    if selected_state == 'Semua Provinsi':
-        st.markdown("**Top Business Segment dari Seller yang Berhasil Diakuisisi (Nasional)**")
-        top_segments = (
-            deals_with_state['business_segment']
-            .value_counts()
-            .head(10)
-            .reset_index()
-        )
-    else:
-        st.markdown(f"**Top Business Segment dari Seller di Provinsi {selected_state}**")
-        top_segments = (
-            deals_with_state[deals_with_state['seller_state'] == selected_state]
-            ['business_segment']
-            .value_counts()
-            .head(10)
-            .reset_index()
-        )
-
+    
+    deals_with_state['business_segment_formatted'] = deals_with_state['business_segment'].dropna().apply(format_snake_case)
+    
+    top_segments = (
+        deals_with_state['business_segment_formatted']
+        .value_counts()
+        .head(10)
+        .reset_index()
+    )
     top_segments.columns = ['Business Segment', 'Jumlah Seller']
+    
     fig_top_segments = px.bar(
         top_segments,
         x='Jumlah Seller',
@@ -593,12 +556,14 @@ with col2:
     fig_top_segments.update_layout(
         yaxis={'categoryorder': 'total ascending'},
         height=450,
-        yaxis_title="Business Segment",
-        xaxis_title="Jumlah Seller"
+        yaxis_title="Segmen Bisnis",
+        xaxis_title="Jumlah Seller Terakuisisi"
     )
     st.plotly_chart(fig_top_segments, use_container_width=True)
 
-# --- 6. Analisis Potensi Perluasan Pasar ---
+st.subheader("Kesempatan dalam Kesenjangan")
+st.markdown("Grafik di atas menunjukkan **kita 10 kategori produk yang paling sering dipesan serta 10 segmen bisnis penjual yang terpopuler**. Dapat dilihat bahwa beberapa kategori produk memiliki **jumlah pesanan yang sangat besar**, namun **tidak ada segmen bisnis** yang sesuai untuk kategori produk tersebut (Bed Bath Table, Sports Leisure, dan Watches Gifts). Ini menunjukkan bahwa ada *demand* terhadap kategori tersebut sehingga strategi yang dapat diambil adalah **memfokuskan pencarian penjual yang bergerak di segmen bisnis yang populer, namun sepi penjual**.")
+
 st.markdown("---")
 counts = deals['lead_type'].value_counts().sort_values()
 proportions = counts / counts.sum()
@@ -614,7 +579,7 @@ with col2:
     st.subheader('Penjual "Online Medium" sebagai Kunci Pertumbuhan')
     st.write(f"Dengan **39% penjual** yang berhasil diakuisisi berada di segmen 'Online Medium', strategi pemasaran harus fokus pada aktivasi & akselerasi mereka. Insentif yang tepat dan kampanye pertumbuhan dapat membuka potensi pendapatan yang signifikan dari segmen ini.")
 st.header("Prioritaskan Channel dengan Konversi Cepat untuk Percepatan Akuisisi")
-st.markdown("Display dan direct traffic terbukti menghasilkan seller lebih cepat. Mengalihkan fokus dan anggaran ke channel berkonversi cepat akan memperpendek siklus akuisisi dan mempercepat pertumbuhan seller berkualitas")
+st.markdown("Display dan direct traffic terbukti menghasilkan seller lebih cepat. Mengalihkan fokus dan anggaran ke channel berkonversi cepat akan memperpendek siklus akuisisi dan mempercepat pertumbuhan *seller* berkualitas.")
 df = pd.merge(deals, leads[['mql_id', 'first_contact_date', 'origin']], on='mql_id', how='left')
 df['conversion_days'] = (df['won_date'] - df['first_contact_date']).dt.days
 avg_conversion = df.groupby('origin')['conversion_days'].mean().sort_values(ascending=False).reset_index()
@@ -632,3 +597,28 @@ fig = px.bar(
 fig.update_traces(text=avg_conversion['conversion_days'].round(1), textposition='outside')
 fig.update_layout(coloraxis_showscale=False)
 st.plotly_chart(fig, use_container_width=True)
+
+st.markdown("---")
+st.header("Apa yang Dapat Kita Simpulkan?")
+
+st.markdown("""
+Analisis dasbor e-commerce Brasil menyoroti tiga temuan kunci:
+
+1.  **Kinerja Logistik:** **Rata-rata delay masih 9,4 hari** dengan mayoritas *lead-time* terjadi pada tahap **kurir-ke-pelanggan**.
+
+2.  **Biaya Pengiriman:** **Beban ongkos kirim** yang tinggi (relatif terhadap harga produk) terbukti secara konsisten **menurunkan skor ulasan** seiring dengan kenaikan biaya.
+
+3.  **Kesenjangan Pasar:** Terdapat **ketimpangan *supply-demand*** di mana permintaan pelanggan sangat beragam, namun *demand* terhadap kategori produk favorit tertentu belum dihadapi oleh penjual di segmen bisnis yhang sama.
+
+Untuk menjaga pertumbuhan dan kepuasan pelanggan, perusahaan perlu mengambil tindakan strategis berikut:
+
+- **Memperketat *Service Level Agreement (SLA)*** dengan mitra logistik dan mempertimbangkan penambahan *hub last-mile* di wilayah dengan keterlambatan tinggi.
+- **Menurunkan rasio ongkir** yang dirasakan pelanggan melalui strategi *negosiasi* dengan kurir untuk produk bervolume tinggi atau memberikan *subsidi* pengiriman.
+- **Menyeimbangkan akuisisi penjual** dengan merekrut lebih banyak penjual di kategori produk yang sangat diminati namun pasokannya kurang.
+""")
+
+st.markdown("---")
+
+st.header("***~~ Close Gaps, Scale Faster, Continue Stronger ~~***")
+
+st.markdown("---")
