@@ -551,7 +551,54 @@ with col2:
     )
     st.plotly_chart(fig_top_cats, use_container_width=True)
 
-st.markdown("---")
+with col1:
+    st.subheader("Kesempatan dalam Kesenjangan")
+    st.markdown("Seller banyak berasal dari segmen seperti home decor dan health beauty, namun data pembelian menunjukkan preferensi konsumen yang jauh lebih beragam. Ketimpangan ini menjadi sinyal untuk menyelaraskan pasokan dengan permintaan agar potensi pertumbuhan tidak terhambat oleh ketidaksesuaian antara ekosistem penjual dan kebutuhan pasar.")
+with col2:
+    # Gabungkan closed deals dengan seller_state
+    deals_with_state = deals.merge(
+        sellers[['seller_id', 'seller_state']], on='seller_id', how='left'
+    )
+
+    # Filter berdasarkan provinsi (state)
+    if selected_state == 'Semua Provinsi':
+        st.markdown("**Top Business Segment dari Seller yang Berhasil Diakuisisi (Nasional)**")
+        top_segments = (
+            deals_with_state['business_segment']
+            .value_counts()
+            .head(10)
+            .reset_index()
+        )
+    else:
+        st.markdown(f"**Top Business Segment dari Seller di Provinsi {selected_state}**")
+        top_segments = (
+            deals_with_state[deals_with_state['seller_state'] == selected_state]
+            ['business_segment']
+            .value_counts()
+            .head(10)
+            .reset_index()
+        )
+
+    top_segments.columns = ['Business Segment', 'Jumlah Seller']
+
+    fig_top_segments = px.bar(
+        top_segments,
+        x='Jumlah Seller',
+        y='Business Segment',
+        text='Jumlah Seller',
+        orientation='h',
+        color_discrete_sequence=[THEME_COLOR],
+        template=PLOTLY_TEMPLATE
+    )
+
+    fig_top_segments.update_layout(
+        yaxis={'categoryorder': 'total ascending'},
+        height=450,
+        yaxis_title="Business Segment",
+        xaxis_title="Jumlah Seller"
+    )
+
+    st.plotly_chart(fig_top_segments, use_container_width=True)
 
 
 # --- 6. Analisis Potensi Perluasan Pasar ---
