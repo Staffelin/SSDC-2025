@@ -18,10 +18,10 @@ def load_data():
     try:
         payments = pd.read_csv("https://drive.google.com/uc?id=113dmpJdb8hA8urg45nYkYXDWhdFvCBYL")
         customers = pd.read_csv("https://drive.google.com/uc?id=1F2-guLBn-XsTf9TKg6lMrFYHZR_CZbpl")
-        orders = pd.read_csv("https://drive.google.com/uc?id=11CtVRGgAEmKYPFYmcDwbVLgpZg_smDfo", parse_dates=['order_purchase_timestamp', 'order_delivered_customer_date', 'order_estimated_delivery_date'])
+        orders = pd.read_csv("https://drive.google.com/uc?id=11CtVRGgAEmKYPFYmcDwbVLgpZg_smDfo", parse_dates=['order_purchase_timestamp', 'order_delivered_customer_date', 'order_estimated_delivery_date', 'order_approved_at', 'order_delivered_carrier_date'])
         sellers = pd.read_csv("https://drive.google.com/uc?id=1hWy1kOf2X6dr2gaP5DuanPqyjNdYuxui")
         products = pd.read_csv("https://drive.google.com/uc?id=14BWKVgA4HuRRat8BJxkYIJA6A0pcw0Kr")
-        order_items = pd.read_csv("https://drive.google.com/uc?id=1dtiJfdrUDZoduKu-y29j_BSoi4uwwcAE")
+        order_items = pd.read_csv("https://drive.google.com/uc?id=1dtiJfdrUDZoduKu-y29j_BSoi4uwwcAE", parse_dates=["shipping_limit_date"])
         deals = pd.read_csv("https://drive.google.com/uc?id=1Y-nwkv9D91luGetDrVanJQpPrPLyQnY9", parse_dates=["won_date"])
         cat_trans = pd.read_csv("https://drive.google.com/uc?id=1gLiDRqex2oFmE62t2hMXlRJUxv6kjLZ5")
         reviews = pd.read_csv("https://drive.google.com/uc?id=1JAge-xr3SkoTI-_wPpW7gHQaanZ-DWMF")
@@ -208,7 +208,7 @@ def load_data():
     return orders, order_items, products, cat_trans, customers
 
 
-orders, order_items, products, cat_trans, customers = load_data()
+# orders, order_items, products, cat_trans, customers = load_data()
 
 items = order_items.merge(products[["product_id", "product_category_name"]], on="product_id", how="left")
 items = items.merge(cat_trans, on="product_category_name", how="left")
