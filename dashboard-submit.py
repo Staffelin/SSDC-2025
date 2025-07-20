@@ -16,19 +16,20 @@ PLOTLY_TEMPLATE = "plotly_white"
 def load_data():
     path = "E-commerce/"
     try:
-        payments = pd.read_csv(path + "order_payments_dataset.csv")
-        customers = pd.read_csv(path + "customers_dataset.csv")
-        orders = pd.read_csv(path + "orders_dataset.csv", parse_dates=['order_purchase_timestamp', 'order_delivered_customer_date', 'order_estimated_delivery_date'])
-        sellers = pd.read_csv(path + "sellers_dataset.csv")
-        products = pd.read_csv(path + "products_dataset.csv")
-        order_items = pd.read_csv(path + "order_items_dataset.csv")
-        deals = pd.read_csv(path + "closed_deals_dataset.csv", parse_dates=["won_date"])
-        cat_trans = pd.read_csv(path + "product_category_name_translation.csv")
-        reviews = pd.read_csv(path + "order_reviews_dataset_translated.csv")
-        leads = pd.read_csv(path + "marketing_qualified_leads_dataset.csv", parse_dates=["first_contact_date"])
+        payments = pd.read_csv("https://drive.google.com/uc?id=113dmpJdb8hA8urg45nYkYXDWhdFvCBYL")
+        customers = pd.read_csv("https://drive.google.com/uc?id=1F2-guLBn-XsTf9TKg6lMrFYHZR_CZbpl")
+        orders = pd.read_csv("https://drive.google.com/uc?id=11CtVRGgAEmKYPFYmcDwbVLgpZg_smDfo", parse_dates=['order_purchase_timestamp', 'order_delivered_customer_date', 'order_estimated_delivery_date'])
+        sellers = pd.read_csv("https://drive.google.com/uc?id=1hWy1kOf2X6dr2gaP5DuanPqyjNdYuxui")
+        products = pd.read_csv("https://drive.google.com/uc?id=14BWKVgA4HuRRat8BJxkYIJA6A0pcw0Kr")
+        order_items = pd.read_csv("https://drive.google.com/uc?id=1dtiJfdrUDZoduKu-y29j_BSoi4uwwcAE")
+        deals = pd.read_csv("https://drive.google.com/uc?id=1Y-nwkv9D91luGetDrVanJQpPrPLyQnY9", parse_dates=["won_date"])
+        cat_trans = pd.read_csv("https://drive.google.com/uc?id=1gLiDRqex2oFmE62t2hMXlRJUxv6kjLZ5")
+        reviews = pd.read_csv("https://drive.google.com/uc?id=1JAge-xr3SkoTI-_wPpW7gHQaanZ-DWMF")
+        leads = pd.read_csv("https://drive.google.com/uc?id=1Ec2sgXZG4JMWlcHzg5NbDUrXw6okdSBa", parse_dates=["first_contact_date"])
 
     except FileNotFoundError as e:
-        st.error(f"Error: Salah satu file dataset tidak ditemukan di '{path}'. Pastikan semua file ada, termasuk 'order_reviews_dataset_translated.csv'.")
+        missing_file = str(e).split("'")[1] if "'" in str(e) else str(e)
+        st.error(f"Error: File dataset '{missing_file}' tidak ditemukan di '{path}'. Pastikan semua file ada.")
         st.stop()
     return payments, customers, orders, sellers, products, order_items, reviews, cat_trans, deals, leads
 
@@ -40,6 +41,7 @@ payments, customers, orders, sellers, products, order_items, reviews, cat_trans,
 
 items = order_items.merge(products, on="product_id", how="left")
 items = items.merge(cat_trans, on="product_category_name", how="left")
+items['product_category_name_english'] = items['product_category_name_english'].apply(format_snake_case)
 df_master = orders.merge(reviews, on="order_id", how="left")
 df_master = df_master.merge(items, on="order_id", how="left")
 df_master = df_master.merge(customers, on='customer_id', how='left')
@@ -75,7 +77,7 @@ st.markdown("Hampir 100.000 pesanan dan 96.000 pelanggan mencerminkan bahwa peru
 
 st.markdown("---")
 
-st.header("Bagiamana Kondisi Perusahaan Saat Ini?")
+st.header("Bagaimana Kondisi Perusahaan Saat Ini?")
 st.markdown("Agar mengetahui langkah yang dapat diambil agar perusahaan tetap tumbuh, perlu diketahui terlebih dahulu kondisi *e-commerce* saat ini, seperti **analisis pengalaman pengguna** serta **efisiensi operasional perusahaan**.")
 
 st.markdown("---")
@@ -205,22 +207,39 @@ def load_data():
     
     return orders, order_items, products, cat_trans, customers
 
+
 orders, order_items, products, cat_trans, customers = load_data()
 
 items = order_items.merge(products[["product_id", "product_category_name"]], on="product_id", how="left")
 items = items.merge(cat_trans, on="product_category_name", how="left")
+
 items['product_category_name_english'] = items['product_category_name_english'].dropna().apply(format_snake_case)
 
 st.set_page_config(page_title="E-commerce Operational Dashboard", layout="wide")
+st.title("📈 E-commerce Operational Dashboard")
 
-df_analysis = orders.merge(items, on='order_id', how='left')
+df_analysis = orders.merge(items, on="order_id", how="left")
 df_analysis = df_analysis[df_analysis['order_status'] == 'delivered'].dropna(
-    subset=['order_purchase_timestamp', 'order_approved_at', 'order_delivered_carrier_date', 'order_delivered_customer_date', 'order_estimated_delivery_date', 'shipping_limit_date', 'product_category_name_english']
+    subset=[
+        'order_purchase_timestamp',
+        'order_approved_at',
+        'order_delivered_carrier_date',
+        'order_delivered_customer_date',
+        'order_estimated_delivery_date',
+        'shipping_limit_date',
+        'product_category_name_english'
+    ]
 )
-df_analysis['days_late'] = (df_analysis['order_delivered_customer_date'] - df_analysis['order_estimated_delivery_date']).dt.total_seconds() / (24 * 3600)
+df_analysis['days_late'] = (
+    df_analysis['order_delivered_customer_date'] - df_analysis['order_estimated_delivery_date']
+).dt.total_seconds() / (24 * 3600)
 df_analysis['is_on_time'] = df_analysis['days_late'] <= 0
-df_analysis['seller_dispatched_on_time'] = df_analysis['order_delivered_carrier_date'] <= df_analysis['shipping_limit_date']
-df_analysis['seller_dispatch_days_late'] = (df_analysis['order_delivered_carrier_date'] - df_analysis['shipping_limit_date']).dt.total_seconds() / (24 * 3600)
+df_analysis['seller_dispatched_on_time'] = (
+    df_analysis['order_delivered_carrier_date'] <= df_analysis['shipping_limit_date']
+)
+df_analysis['seller_dispatch_days_late'] = (
+    df_analysis['order_delivered_carrier_date'] - df_analysis['shipping_limit_date']
+).dt.total_seconds() / (24 * 3600)
 df_analysis = df_analysis.merge(customers[['customer_id', 'customer_state']], on='customer_id', how='left')
 
 st.header("Masih Banyak yang Perlu Diperbaiki dari Sistem Pengiriman Kita")
@@ -236,20 +255,32 @@ monthly_performance = df_analysis.groupby('month').agg(
     seller_late_rate=('seller_dispatched_on_time', lambda x: (~x).mean() * 100)
 ).reset_index()
 
-monthly_late_melted = monthly_performance.melt(
-    id_vars='month',
-    value_vars=['customer_late_rate', 'seller_late_rate'],
-    var_name='metric_type',
-    value_name='rate'
+late_orders = df_analysis[df_analysis['days_late'] > 0].copy()
+late_orders['month'] = late_orders['order_purchase_timestamp'].dt.to_period('M').dt.to_timestamp()
+
+monthly_days_late = late_orders.groupby('month')['days_late'].mean().reset_index()
+
+import plotly.express as px
+
+fig_dayslate_trend = px.line(
+    monthly_days_late,
+    x='month',
+    y='days_late',
+    markers=True,
+    title="Tren Rata-rata Hari Keterlambatan per Bulan"
 )
-rename_map = {
-    'customer_late_rate': 'Tingkat Keterlambatan Pelanggan',
-    'seller_late_rate': 'Tingkat Keterlambatan Penjual'
-}
-monthly_late_melted['metric_type'] = monthly_late_melted['metric_type'].map(rename_map)
+fig_dayslate_trend.update_layout(
+    yaxis_title="Rata-rata Hari Terlambat",
+    xaxis_title="Bulan"
+)
+st.plotly_chart(fig_dayslate_trend, use_container_width=True)
+st.markdown("---")
 
-col1, col2 = st.columns([1, 2])
+# --- 7. Interactive Regional and Product Analysis ---
+st.header("Wilayah Berkinerja Buruk Menjadi Beban Pertumbuhan")
+st.markdown("Provinsi dengan tingkat pengiriman rendah secara langsung menurunkan performa rata-rata nasional. Tanpa prioritas perbaikan di area ini, ekspansi hanya akan menambah volume masalah, bukan nilai bisnis.")
 
+col1, col2 = st.columns(2)
 with col1:
     st.subheader("Angka Keterlambatan Masih Tinggi...")
     st.metric("Late Delivery Rate", f"{late_rate:.1f}%", help="Persentase pesanan yang diterima pelanggan setelah estimasi tanggal pengiriman.")
@@ -455,7 +486,6 @@ with col1:
         value=f"{median_freight_percentage:.2f}%",
         help="Biaya pengiriman median dibagi dengan harga produk median. Ini mewakili biaya kirim untuk produk 'tipikal'."
     )
-    
     st.info(
         "Metrik berbasis median ini memberikan gambaran biaya kirim yang lebih representatif "
         "untuk produk pada umumnya, karena tidak terlalu dipengaruhi oleh produk yang sangat mahal atau sangat murah."
@@ -469,7 +499,6 @@ with col2:
     df_freight_analysis['freight_bin'] = pd.cut(df_freight_analysis['freight_value'], bins=bins, labels=labels, right=False)
     
     review_by_freight = df_freight_analysis.groupby('freight_bin')['review_score'].mean().reset_index().dropna()
-    
     fig_review_freight = px.bar(
         review_by_freight, 
         x='freight_bin', 
@@ -496,7 +525,6 @@ col1, col2 = st.columns([1, 2])
 with col1:
     map_title = "Peta Pesanan Nasional" if selected_state == 'Semua Provinsi' else f"Lokasi Provinsi: {selected_state}"
     st.markdown(f"**{map_title}**")
-    
     state_order_counts = df_popular['customer_state'].value_counts().reset_index()
     state_order_counts.columns = ['state', 'orders']
     
@@ -511,13 +539,9 @@ with col1:
         color_continuous_scale="Blues",
         scope="south america"
     )
-    
-    # <-- MODIFIKASI: Logika kondisional untuk zoom peta -->
     if selected_state == 'Semua Provinsi':
-        # Tampilkan seluruh Brasil
         fig_map.update_geos(fitbounds="geojson", visible=False)
     else:
-        # Zoom ke provinsi yang dipilih
         fig_map.update_geos(fitbounds="locations", visible=False)
         fig_map.data[0].locations = [selected_state]
 
@@ -525,7 +549,6 @@ with col1:
     st.plotly_chart(fig_map, use_container_width=True)
 
 with col2:
-    # <-- MODIFIKASI: Logika kondisional untuk data grafik batang -->
     if selected_state == 'Semua Provinsi':
         st.markdown("**Top 10 Kategori Produk (Nasional)**")
         top_cats_data = df_popular['product_category_name_english'].value_counts().head(10).reset_index()
@@ -538,9 +561,7 @@ with col2:
             .head(10)
             .reset_index()
         )
-    
     top_cats_data.columns = ['Kategori', 'Jumlah Pesanan']
-    
     fig_top_cats = px.bar(
         top_cats_data,
         x='Jumlah Pesanan',
@@ -562,12 +583,10 @@ with col1:
     st.subheader("Kesempatan dalam Kesenjangan")
     st.markdown("Seller banyak berasal dari segmen seperti home decor dan health beauty, namun data pembelian menunjukkan preferensi konsumen yang jauh lebih beragam. Ketimpangan ini menjadi sinyal untuk menyelaraskan pasokan dengan permintaan agar potensi pertumbuhan tidak terhambat oleh ketidaksesuaian antara ekosistem penjual dan kebutuhan pasar.")
 with col2:
-    # Gabungkan closed deals dengan seller_state
     deals_with_state = deals.merge(
         sellers[['seller_id', 'seller_state']], on='seller_id', how='left'
     )
 
-    # Filter berdasarkan provinsi (state)
     if selected_state == 'Semua Provinsi':
         st.markdown("**Top Business Segment dari Seller yang Berhasil Diakuisisi (Nasional)**")
         top_segments = (
@@ -587,7 +606,6 @@ with col2:
         )
 
     top_segments.columns = ['Business Segment', 'Jumlah Seller']
-
     fig_top_segments = px.bar(
         top_segments,
         x='Jumlah Seller',
@@ -597,16 +615,13 @@ with col2:
         color_discrete_sequence=[THEME_COLOR],
         template=PLOTLY_TEMPLATE
     )
-
     fig_top_segments.update_layout(
         yaxis={'categoryorder': 'total ascending'},
         height=450,
         yaxis_title="Business Segment",
         xaxis_title="Jumlah Seller"
     )
-
     st.plotly_chart(fig_top_segments, use_container_width=True)
-
 
 # --- 6. Analisis Potensi Perluasan Pasar ---
 st.markdown("---")
@@ -619,21 +634,15 @@ col1, col2 = st.columns([2, 1])
 with col1:
     st.plotly_chart(fig_leads, use_container_width=True)
 with col2:
-    pct = proportions.get('Online Medium', 0) # Pastikan nama lead_type sesuai
+    pct = proportions.get('Online Medium', 0)
     pct_str = f'{pct:.1%}'.replace('.', ',')
     st.subheader('Penjual "Online Medium" sebagai Kunci Pertumbuhan')
     st.write(f"Dengan **39% penjual** yang berhasil diakuisisi berada di segmen 'Online Medium', strategi pemasaran harus fokus pada aktivasi & akselerasi mereka. Insentif yang tepat dan kampanye pertumbuhan dapat membuka potensi pendapatan yang signifikan dari segmen ini.")
 
-# ===============================
 df = pd.merge(deals, leads[['mql_id', 'first_contact_date', 'origin']], on='mql_id', how='left')
-
-# Hitung durasi konversi (dalam hari)
 df['conversion_days'] = (df['won_date'] - df['first_contact_date']).dt.days
-
-# Hitung rata-rata durasi per origin
 avg_conversion = df.groupby('origin')['conversion_days'].mean().sort_values(ascending=False).reset_index()
 
-# Visualisasi
 fig = px.bar(
     avg_conversion,
     x='conversion_days', y='origin',
@@ -644,9 +653,6 @@ fig = px.bar(
     title='⏱️ Rata-rata Waktu Konversi Lead Menjadi Seller per Channel (Origin)',
     template=PLOTLY_TEMPLATE
 )
-
 fig.update_traces(text=avg_conversion['conversion_days'].round(1), textposition='outside')
 fig.update_layout(coloraxis_showscale=False)
-
-# Tampilkan chart
 st.plotly_chart(fig, use_container_width=True)
