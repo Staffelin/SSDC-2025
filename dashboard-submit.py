@@ -47,8 +47,9 @@ df_master = df_master.merge(items, on="order_id", how="left")
 df_master = df_master.merge(customers, on='customer_id', how='left')
 df_master['product_category_name_english'] = df_master['product_category_name_english'].dropna().apply(format_snake_case)
 
-st.title("📈 Analisis Kinerja Bisnis E-commerce")
-st.markdown("Dasbor ini dirancang untuk mengungkap wawasan strategis dari data operasional, mencakup analisis mendalam mengenai **preferensi pelanggan**, **kualitas produk**, dan **kinerja pengiriman** untuk mendorong pertumbuhan bisnis.")
+st.title("Scalability Through Continuity")
+st.markdown("Made by Astutea - SSDC2025006")
+st.markdown(" E-Commerce telah mencapai skala yang mengesankan dengan hampir 100.000 pesanan dan 96.000 pelanggan, menandakan fondasi operasional yang solid. Namun pertumbuhan pendapatan menunjukkan tanda-tanda stagnasi dan belum diimbangi oleh kualitas pengiriman, relevansi produk, serta keseimbangan penawaran seller. Dashboard ini mengungkap area strategis yang harus diperbaiki untuk mendorong pertumbuhan berkelanjutan. Fokus diarahkan pada penyelarasan preferensi pelanggan dan inventori, akselerasi seller potensial, serta optimalisasi logistik agar perusahaan tidak hanya besar, tapi juga tangguh dan relevan di tengah dinamika pasar yang kompetitif")
 st.markdown("---")
 
 st.header("Perusahaan Sudah Berkembang Pesat, Akankah Terus Seperti Ini?")
@@ -612,7 +613,8 @@ with col2:
     pct_str = f'{pct:.1%}'.replace('.', ',')
     st.subheader('Penjual "Online Medium" sebagai Kunci Pertumbuhan')
     st.write(f"Dengan **39% penjual** yang berhasil diakuisisi berada di segmen 'Online Medium', strategi pemasaran harus fokus pada aktivasi & akselerasi mereka. Insentif yang tepat dan kampanye pertumbuhan dapat membuka potensi pendapatan yang signifikan dari segmen ini.")
-
+st.header("Prioritaskan Channel dengan Konversi Cepat untuk Percepatan Akuisisi")
+st.markdown("Display dan direct traffic terbukti menghasilkan seller lebih cepat. Mengalihkan fokus dan anggaran ke channel berkonversi cepat akan memperpendek siklus akuisisi dan mempercepat pertumbuhan seller berkualitas")
 df = pd.merge(deals, leads[['mql_id', 'first_contact_date', 'origin']], on='mql_id', how='left')
 df['conversion_days'] = (df['won_date'] - df['first_contact_date']).dt.days
 avg_conversion = df.groupby('origin')['conversion_days'].mean().sort_values(ascending=False).reset_index()
@@ -624,7 +626,7 @@ fig = px.bar(
     color='conversion_days',
     color_continuous_scale='blues',
     labels={'conversion_days': 'Rata-rata Hari Konversi', 'origin': 'Channel (Origin)'},
-    title='⏱️ Rata-rata Waktu Konversi Lead Menjadi Seller per Channel (Origin)',
+    title='Rata-rata Waktu Konversi Lead Menjadi Seller per Channel (Origin)',
     template=PLOTLY_TEMPLATE
 )
 fig.update_traces(text=avg_conversion['conversion_days'].round(1), textposition='outside')
