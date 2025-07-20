@@ -29,18 +29,19 @@ def load_data():
         deals = pd.read_csv(path + "closed_deals_dataset.csv", parse_dates=["won_date"])
         cat_trans = pd.read_csv(path + "product_category_name_translation.csv")
         reviews = pd.read_csv(path + "order_reviews_dataset_translated.csv")
+        leads = pd.read_csv(path + "marketing_qualified_leads_dataset.csv", parse_dates=["first_contact_date"])
 
     except FileNotFoundError as e:
         st.error(f"Error: Salah satu file dataset tidak ditemukan di '{path}'. Pastikan semua file ada, termasuk 'order_reviews_dataset_translated.csv'.")
         st.stop()
-    return payments, customers, orders, sellers, products, order_items, reviews, cat_trans, deals
+    return payments, customers, orders, sellers, products, order_items, reviews, cat_trans, deals, leads
 
 def format_snake_case(s):
     if isinstance(s, str): return s.replace('_', ' ').title()
     return s
 
 # Memuat semua data
-payments, customers, orders, sellers, products, order_items, reviews, cat_trans, deals = load_data()
+payments, customers, orders, sellers, products, order_items, reviews, cat_trans, deals, leads = load_data()
 
 # --- Membuat DataFrame Utama (df_master) ---
 items = order_items.merge(products, on="product_id", how="left")
@@ -506,3 +507,30 @@ with col2:
     pct_str = f'{pct:.1%}'.replace('.', ',')
     st.subheader('Penjual "Online Medium" sebagai Kunci Pertumbuhan')
     st.write(f"Dengan **39% penjual** yang berhasil diakuisisi berada di segmen 'Online Medium', strategi pemasaran harus fokus pada aktivasi & akselerasi mereka. Insentif yang tepat dan kampanye pertumbuhan dapat membuka potensi pendapatan yang signifikan dari segmen ini.")
+
+# ===============================
+df = pd.merge(deals, leads[['mql_id', 'first_contact_date', 'origin']], on='mql_id', how='left')
+
+# Hitung durasi konversi (dalam hari)
+df['conversion_days'] = (df['won_date'] - df['first_contact_date']).dt.days
+
+# Hitung rata-rata durasi per origin
+avg_conversion = df.groupby('origin')['conversion_days'].mean().sort_values(ascending=False).reset_index()
+
+# Visualisasi
+fig = px.bar(
+    avg_conversion,
+    x='conversion_days', y='origin',
+    orientation='h',
+    color='conversion_days',
+    color_continuous_scale='blues',
+    labels={'conversion_days': 'Rata-rata Hari Konversi', 'origin': 'Channel (Origin)'},
+    title='⏱️ Rata-rata Waktu Konversi Lead Menjadi Seller per Channel (Origin)',
+    template=PLOTLY_TEMPLATE
+)
+
+fig.update_traces(text=avg_conversion['conversion_days'].round(1), textposition='outside')
+fig.update_layout(coloraxis_showscale=False)
+
+# Tampilkan chart
+st.plotly_chart(fig, use_container_width=True)
