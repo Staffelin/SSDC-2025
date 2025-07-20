@@ -50,7 +50,7 @@ st.title("📈 Analisis Kinerja Bisnis E-commerce")
 st.markdown("Dasbor ini dirancang untuk mengungkap wawasan strategis dari data operasional, mencakup analisis mendalam mengenai **preferensi pelanggan**, **kualitas produk**, dan **kinerja pengiriman** untuk mendorong pertumbuhan bisnis.")
 st.markdown("---")
 
-st.header("Perusahaan Sudah Berkembang Pesat, Tetapi Akankah Terus Seperti Ini?")
+st.header("Perusahaan Sudah Berkembang Pesat, Akankah Terus Seperti Ini?")
 col1, col2 = st.columns([1, 2])
 with col1:
     st.subheader("Statistik Terlihat Bagus, Namun...")
@@ -72,37 +72,39 @@ with col2:
     fig = px.area(monthly_revenue, x='month', y='payment_value', title="Sudah 9 Bulan Tanpa Rekor Baru Pendapatan (Terakhir Nov 2017)", labels={'month': 'Bulan', 'payment_value': 'Total Pendapatan (R$)'}, color_discrete_sequence=[THEME_COLOR], template=PLOTLY_TEMPLATE)
     fig.update_layout(height=450)
     st.plotly_chart(fig, use_container_width=True)
-st.markdown("Hampir 100.000 pesanan dan 96.000 pelanggan mencerminkan skala operasional yang luas, namun belum sepenuhnya mencerminkan kualitas pertumbuhan. Tanpa perbaikan efisiensi, pengalaman pelanggan, dan konversi penjual, skala besar justru berisiko menjadi beban sistem dan menurunkan profitabilitas jangka panjang.")
+st.markdown("Hampir 100.000 pesanan dan 96.000 pelanggan mencerminkan bahwa perusahaan ini memiliki skala operasional yang luas. **Namun**, kondisi ini belum sepenuhnya mencerminkan kualitas pertumbuhan. Tanpa **perbaikan** dalam segi **pengalaman pengguna**, **efisiensi**, dan **konversi penjual**, skala besar justru berisiko menjadi **beban perusahaan** dan menurunkan **profitabilitas jangka panjang perusahaan**.")
 
 st.markdown("---")
 
 st.header("Bagiamana Kondisi Perusahaan Saat Ini?")
-st.markdown("Bagian ini akan menelusuri tentang kondisi *e-commerce* saat ini, seperti tanggapan pelanggan terhadap produk di dalamnya serta kinerja operasional pengiriman.")
+st.markdown("Agar mengetahui langkah yang dapat diambil agar perusahaan tetap tumbuh, perlu diketahui terlebih dahulu kondisi *e-commerce* saat ini, seperti **analisis pengalaman pengguna** serta **efisiensi operasional perusahaan**.")
 
 st.markdown("---")
 
 st.header("Apa yang Pelanggan Katakan Tentang Produk Kita?")
-st.markdown("*Rating* yang diberikan oleh pelanggan dapat dipengaruhi oleh berbagai faktor, seperti keterlambatan, barang yang tidak sampai, ataupun cacat produk. Faktor ini dapat menurunkan kepercayaan pelanggan terhadap platform secara keseluruhan dan mengurangi *repeat order* pada kategori yang sama.")
+st.markdown("*Rating* yang diberikan oleh pelanggan dapat dipengaruhi oleh berbagai **faktor negatif**, seperti **keterlambatan**, **barang yang tidak sampai**, ataupun **cacat produk**. Faktor ini dapat **menurunkan kepercayaan pelanggan** terhadap platform secara keseluruhan dan **mengurangi repeat order** pada kategori yang sama.")
 st.subheader("Apa Kategori Produk yang Paling Disukai/Tidak Disukai Pelanggan?")
 min_reviews = st.slider("Jumlah minimum ulasan untuk ditampilkan:", min_value=10, max_value=200, value=50)
 category_quality = df_master.groupby('product_category_name_english').agg(average_score=('review_score', 'mean'), review_count=('review_score', 'count')).reset_index()
 category_quality_filtered = category_quality[category_quality['review_count'] >= min_reviews]
 col1, col2 = st.columns(2)
 with col1:
-    st.markdown("##### Kategori dengan Peringkat Tertinggi")
+    st.markdown("##### Kategori dengan Peringkat Tertinggi (Skala 1-5)")
     top_categories = category_quality_filtered.nlargest(5, 'average_score')
     fig_top = px.bar(top_categories, x='average_score', y='product_category_name_english', orientation='h', text=top_categories['average_score'].apply(lambda x: f'{x:.2f}'), color_discrete_sequence=['#2ca02c'], template=PLOTLY_TEMPLATE)
-    fig_top.update_layout(yaxis={'categoryorder':'total ascending'}, xaxis_title="Skor Rata-rata", yaxis_title=None, xaxis=dict(range=[4,5]))
+    fig_top.update_layout(yaxis={'categoryorder':'total ascending'}, xaxis_title="Skor Rata-rata", yaxis_title=None, xaxis=dict(range=[1,5]))
     st.plotly_chart(fig_top, use_container_width=True)
 with col2:
-    st.markdown("##### Kategori dengan Peringkat Terendah")
+    st.markdown("##### Kategori dengan Peringkat Terendah (Skala 1-5)")
     bottom_categories = category_quality_filtered.nsmallest(5, 'average_score')
     fig_bottom = px.bar(bottom_categories, x='average_score', y='product_category_name_english', orientation='h', text=bottom_categories['average_score'].apply(lambda x: f'{x:.2f}'), color_discrete_sequence=['#d62728'], template=PLOTLY_TEMPLATE)
     fig_bottom.update_layout(yaxis={'categoryorder':'total descending'}, xaxis_title="Skor Rata-rata", yaxis_title=None, xaxis=dict(range=[1,5]))
     st.plotly_chart(fig_bottom, use_container_width=True)
 
-st.subheader("Kualitas Pengiriman Menurukan Kepercayaan")
-st.markdown("Ketidakmampuan memenuhi janji pengiriman telah menjadi sumber utama ketidakpuasan pelanggan. Selama titik ini belum diperbaiki, pertumbuhan akuisisi hanya akan diimbangi oleh hilangnya pelanggan lama.")
+st.markdown("Terlihat kategori-kategori yang memiliki nilai ulasan tertinggi dan terendah. **Lantas mengapa** kategori tersebut memiliki nilai ulasan yang rendah?")
+
+st.subheader("Rendahnya Kualitas Pengiriman Menurunkan Kepercayaan Pelanggan")
+
 complaint_keywords = {
     "Late Delivery": ["atras", "demor", "prazo", "lento", "extravia", "pass"],
     "Missing Items / Partial Delivery": ["falt", "incompleto", "apenas", "só", " so ", "parte", "unidade", "kit", "parcial", "quantitade", "somen"],
@@ -143,6 +145,7 @@ else:
 
 col1, col2 = st.columns(2)
 with col1:
+    st.markdown("##### Keluhan Paling Umum dari Ulasan Negatif (<= 2 Bintang)")
     if not low_score_reviews.empty:
         category_counts = low_score_reviews['complaint_category'].value_counts().reset_index()
         fig_complaints = px.bar(category_counts, x='count', y='complaint_category', orientation='h', text_auto=True, color_discrete_sequence=[THEME_COLOR], template=PLOTLY_TEMPLATE)
@@ -157,9 +160,13 @@ with col2:
         selected_complaint = st.selectbox("Pilih kategori keluhan untuk melihat contoh:", options=complaint_category_list)
         
         sample_comments = low_score_reviews[low_score_reviews['complaint_category'] == selected_complaint]
-        st.dataframe(sample_comments[['review_score', 'review_comment_message_en', 'review_comment_message']].head(50))
+        st.dataframe(sample_comments[['review_score', 'review_comment_message_en']].head(50))
     else:
         st.info("Tidak ada komentar untuk ditampilkan.")
+st.caption("**Disclaimer**: Ulasan ini dikategorikan secara otomatis dengan mencari kata kunci tertentu dalam komentar. Kesalahan klasifikasi mungkin terjadi.")
+
+st.markdown("Ketidakpastian atas pengiriman produk, seperti **pengiriman yang tidak tepat waktu**, **barang tidak lengkap**, bahkan **barang yang sama sekali tidak sampai pengirim** merupakan faktor utama penyebab ulasan rendah. Hal yang sama berlaku untuk beberapa kategori produk dengan ulasan rendah (Office Furniture, Fixed Telephony).")
+st.markdown("Kategori produk lain memiliki keluhan yang lebih **spesifik terhadap kategorinya**, misalnya Fashion Male Clothing yang memiliki banyak masalah tentang **salah pengiriman** dan **refund** (contohnya masalah ukuran yang tidak cocok).")
 
 st.markdown("---")
 
