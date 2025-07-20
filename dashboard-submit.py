@@ -76,7 +76,7 @@ st.markdown("Hampir 100.000 pesanan dan 96.000 pelanggan mencerminkan bahwa peru
 
 st.markdown("---")
 
-st.header("Bagiamana Kondisi Perusahaan Saat Ini?")
+st.header("Bagaimana Kondisi Perusahaan Saat Ini?")
 st.markdown("Agar mengetahui langkah yang dapat diambil agar perusahaan tetap tumbuh, perlu diketahui terlebih dahulu kondisi *e-commerce* saat ini, seperti **analisis pengalaman pengguna** serta **efisiensi operasional perusahaan**.")
 
 st.markdown("---")
@@ -262,28 +262,28 @@ fig_dayslate_trend.update_layout(
 st.plotly_chart(fig_dayslate_trend, use_container_width=True)
 # --- 6.1 KPI Metrics for Total Sellers and Products ---
 # Melt the dataframe to plot both lines
-monthly_late_melted = monthly_performance.melt(
-    id_vars='month',
-    value_vars=['customer_late_rate', 'seller_late_rate'],
-    var_name='metric_type',
-    value_name='rate'
-)
-rename_map = {
-    'customer_late_rate': 'Customer Late Delivery Rate',
-    'seller_late_rate': 'Seller Late Dispatch Rate'
-}
-monthly_late_melted['metric_type'] = monthly_late_melted['metric_type'].map(rename_map)
+# monthly_late_melted = monthly_performance.melt(
+#     id_vars='month',
+#     value_vars=['customer_late_rate', 'seller_late_rate'],
+#     var_name='metric_type',
+#     value_name='rate'
+# )
+# rename_map = {
+#     'customer_late_rate': 'Customer Late Delivery Rate',
+#     'seller_late_rate': 'Seller Late Dispatch Rate'
+# }
+# monthly_late_melted['metric_type'] = monthly_late_melted['metric_type'].map(rename_map)
 
-fig_late_trend = px.line(
-    monthly_late_melted,
-    x='month', y='rate', color='metric_type',
-    title="Tren Late Rate (Pengiriman & Dispatch) Bulanan",
-    markers=True
-)
-fig_late_trend.update_layout(
-    yaxis_title="Late Rate (%)", xaxis_title="Bulan", legend_title_text='Metric'
-)
-st.plotly_chart(fig_late_trend, use_container_width=True)
+# # fig_late_trend = px.line(
+# #     monthly_late_melted,
+# #     x='month', y='rate', color='metric_type',
+# #     title="Tren Late Rate (Pengiriman & Dispatch) Bulanan",
+# #     markers=True
+# # )
+# # fig_late_trend.update_layout(
+# #     yaxis_title="Late Rate (%)", xaxis_title="Bulan", legend_title_text='Metric'
+# # )
+# # st.plotly_chart(fig_late_trend, use_container_width=True)
 st.markdown("---")
 
 # --- 7. Interactive Regional and Product Analysis ---
