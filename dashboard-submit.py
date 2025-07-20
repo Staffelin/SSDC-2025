@@ -29,7 +29,8 @@ def load_data():
         leads = pd.read_csv(path + "marketing_qualified_leads_dataset.csv", parse_dates=["first_contact_date"])
 
     except FileNotFoundError as e:
-        st.error(f"Error: Salah satu file dataset tidak ditemukan di '{path}'. Pastikan semua file ada, termasuk 'order_reviews_dataset_translated.csv'.")
+        missing_file = str(e).split("'")[1] if "'" in str(e) else str(e)
+        st.error(f"Error: File dataset '{missing_file}' tidak ditemukan di '{path}'. Pastikan semua file ada.")
         st.stop()
     return payments, customers, orders, sellers, products, order_items, reviews, cat_trans, deals, leads
 
@@ -41,6 +42,7 @@ payments, customers, orders, sellers, products, order_items, reviews, cat_trans,
 
 items = order_items.merge(products, on="product_id", how="left")
 items = items.merge(cat_trans, on="product_category_name", how="left")
+items['product_category_name_english'] = items['product_category_name_english'].apply(format_snake_case)
 df_master = orders.merge(reviews, on="order_id", how="left")
 df_master = df_master.merge(items, on="order_id", how="left")
 df_master = df_master.merge(customers, on='customer_id', how='left')
@@ -204,14 +206,28 @@ st.set_page_config(page_title="E-commerce Operational Dashboard", layout="wide")
 st.title("📈 E-commerce Operational Dashboard")
 
 # --- Data Prep for the entire dashboard ---
-df_analysis = orders.merge(items, on='order_id', how='left')
+df_analysis = orders.merge(items, on="order_id", how="left")
 df_analysis = df_analysis[df_analysis['order_status'] == 'delivered'].dropna(
-    subset=['order_purchase_timestamp', 'order_approved_at', 'order_delivered_carrier_date', 'order_delivered_customer_date', 'order_estimated_delivery_date', 'shipping_limit_date', 'product_category_name_english']
+    subset=[
+        'order_purchase_timestamp',
+        'order_approved_at',
+        'order_delivered_carrier_date',
+        'order_delivered_customer_date',
+        'order_estimated_delivery_date',
+        'shipping_limit_date',
+        'product_category_name_english'
+    ]
 )
-df_analysis['days_late'] = (df_analysis['order_delivered_customer_date'] - df_analysis['order_estimated_delivery_date']).dt.total_seconds() / (24 * 3600)
+df_analysis['days_late'] = (
+    df_analysis['order_delivered_customer_date'] - df_analysis['order_estimated_delivery_date']
+).dt.total_seconds() / (24 * 3600)
 df_analysis['is_on_time'] = df_analysis['days_late'] <= 0
-df_analysis['seller_dispatched_on_time'] = df_analysis['order_delivered_carrier_date'] <= df_analysis['shipping_limit_date']
-df_analysis['seller_dispatch_days_late'] = (df_analysis['order_delivered_carrier_date'] - df_analysis['shipping_limit_date']).dt.total_seconds() / (24 * 3600)
+df_analysis['seller_dispatched_on_time'] = (
+    df_analysis['order_delivered_carrier_date'] <= df_analysis['shipping_limit_date']
+)
+df_analysis['seller_dispatch_days_late'] = (
+    df_analysis['order_delivered_carrier_date'] - df_analysis['shipping_limit_date']
+).dt.total_seconds() / (24 * 3600)
 df_analysis = df_analysis.merge(customers[['customer_id', 'customer_state']], on='customer_id', how='left')
 
 # --- 6. High-Level Fulfillment KPIs ---
@@ -260,30 +276,6 @@ fig_dayslate_trend.update_layout(
     xaxis_title="Bulan"
 )
 st.plotly_chart(fig_dayslate_trend, use_container_width=True)
-# --- 6.1 KPI Metrics for Total Sellers and Products ---
-# Melt the dataframe to plot both lines
-# monthly_late_melted = monthly_performance.melt(
-#     id_vars='month',
-#     value_vars=['customer_late_rate', 'seller_late_rate'],
-#     var_name='metric_type',
-#     value_name='rate'
-# )
-# rename_map = {
-#     'customer_late_rate': 'Customer Late Delivery Rate',
-#     'seller_late_rate': 'Seller Late Dispatch Rate'
-# }
-# monthly_late_melted['metric_type'] = monthly_late_melted['metric_type'].map(rename_map)
-
-# # fig_late_trend = px.line(
-# #     monthly_late_melted,
-# #     x='month', y='rate', color='metric_type',
-# #     title="Tren Late Rate (Pengiriman & Dispatch) Bulanan",
-# #     markers=True
-# # )
-# # fig_late_trend.update_layout(
-# #     yaxis_title="Late Rate (%)", xaxis_title="Bulan", legend_title_text='Metric'
-# # )
-# # st.plotly_chart(fig_late_trend, use_container_width=True)
 st.markdown("---")
 
 # --- 7. Interactive Regional and Product Analysis ---
@@ -382,9 +374,16 @@ with col2:
 st.markdown("---")
 
 # Proses: Jam, agar mudah dibandingkan
-df_analysis['order_processing_time'] = (df_analysis['order_approved_at'] - df_analysis['order_purchase_timestamp']).dt.total_seconds() / 3600
-df_analysis['seller_lead_time'] = (df_analysis['order_delivered_carrier_date'] - df_analysis['order_approved_at']).dt.total_seconds() / 3600
-df_analysis['shipping_time'] = (df_analysis['order_delivered_customer_date'] - df_analysis['order_delivered_carrier_date']).dt.total_seconds() / 3600
+df_analysis['order_processing_time'] = (
+    df_analysis['order_approved_at'] - df_analysis['order_purchase_timestamp']
+).dt.total_seconds() / 3600
+df_analysis['seller_lead_time'] = (
+    df_analysis['order_delivered_carrier_date'] - df_analysis['order_approved_at']
+).dt.total_seconds() / 3600
+df_analysis['shipping_time'] = (
+    df_analysis['order_delivered_customer_date'] - df_analysis['order_delivered_carrier_date']
+).dt.total_seconds() / 3600
+
 
 df_time_filtered = df_analysis.copy()
 if selected_state != 'All States':
