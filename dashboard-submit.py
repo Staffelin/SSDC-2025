@@ -291,7 +291,9 @@ with col2:
 
 st.markdown("Terdapat **8.568 pengiriman terlambat** dalam rentang waktu **dua tahun**. Artinya terdapat **3657 pengiriman yang terlambat setiap bulan**.")
 
-st.subheader("Masalah Keterlambatan Terdiri dari Beberapa Aspek")
+st.markdown("---")
+
+st.header("Masalah Keterlambatan Terdiri dari Beberapa Aspek")
 st.markdown("Terdapat ketidakmerataan angka keterlambatan di beberapa provinsi. Selain itu, distribusi lama keterlambatan juga memberikan pola unik.")
 
 control_col1, control_col2, control_col3 = st.columns(3)
@@ -362,7 +364,7 @@ with main_col2:
     state_title = f"di {selected_state}" if selected_state != 'Semua State' else "di Semua Provinsi"
 
     if map_metric_selection == "Customer Lateness Rate":
-        st.subheader("Angka Keterlambatan di Atas 15 Hari Juga Signifikan")
+        st.subheader("Lama Keterlambatan Pengiriman ke Pembeli")
         late_data = state_filtered_data[~state_filtered_data['is_on_time']].copy()
         if not late_data.empty:
             bins = list(np.arange(0, 16, 3)) + [np.inf]
@@ -381,7 +383,7 @@ with main_col2:
         else:
             st.info("Tidak ada data keterlambatan pelanggan pada kriteria ini.")
     else:
-        st.subheader("Mayoritas Keterlambatan Penjual Hanya Beberapa Hari")
+        st.subheader("Lama Keterlambatan Pengiriman ke Kurir")
         late_data = state_filtered_data[~state_filtered_data['seller_dispatched_on_time']].copy()
         if not late_data.empty:
             bins = list(np.arange(0, 16, 3)) + [np.inf]
@@ -402,8 +404,6 @@ with main_col2:
 
 st.markdown("Provinsi dengan tingkat pengiriman rendah secara langsung menurunkan performa rata-rata nasional. Perbaikan di area seperti ini perlu dilakukan.")
 st.markdown("Sangat mungkin juga bahwa keterlambatan yang terjadi merupakan keterlambatan yang sangat drastis, seperti keterlambatan lebih dari 15 hari.")
-
-st.markdown("---")
 
 df_analysis['order_processing_time'] = (df_analysis['order_approved_at'] - df_analysis['order_purchase_timestamp']).dt.total_seconds() / 3600
 df_analysis['seller_lead_time'] = (df_analysis['order_delivered_carrier_date'] - df_analysis['order_approved_at']).dt.total_seconds() / 3600
@@ -430,7 +430,7 @@ fig_avg = go.Figure(go.Bar(
 ))
 
 st.subheader("Bottleneck Pengiriman Menghancurkan Pengalaman Pengguna")
-st.markdown("Kurir ke pelanggan menyumbang 73% waktu pengiriman. Seberapa cepat proses sebelumnya tidak lagi relevan jika tahap akhir membuat pelanggan kecewa. Satu kesalahan di sini bisa menghapus seluruh upaya membangun kepuasan.")
+st.markdown("Kurir ke pelanggan menyumbang 73% waktu pengiriman. Seberapa cepat proses sebelumnya tidak akan berpengaruh jika pada akhirnya produk akan telat.")
 fig_avg.update_layout(
     title=f"Rata-rata Breakdown Waktu Pengiriman ({selected_state})",
     yaxis_title="Rata-rata Waktu (jam)",
@@ -438,17 +438,17 @@ fig_avg.update_layout(
 )
 st.plotly_chart(fig_avg, use_container_width=True)
 
-st.header("🚢 Analisis Biaya Pengiriman (Ongkir) dan Dampaknya")
-st.markdown(
-    "Analisis ini menggali dua temuan utama: tingginya biaya pengiriman relatif terhadap harga produk di beberapa kategori, dan dampak negatifnya terhadap skor ulasan pelanggan."
-)
+st.markdown("---")
+
+st.header("Secara Diam-diam, Mahalnya Ongkir Membuat Pelanggan Tidak Senang")
+st.markdown("Ternyata, biaya pengiriman pada platform ini sangat tinggi dan berdampak negatif terhadap nilai ulasan pelanggan.")
 
 df_freight_analysis = df_master.dropna(subset=['freight_value', 'price', 'review_score', 'product_category_name_english'])
 
 col1, col2 = st.columns(2)
 
 with col1:
-    st.markdown("**Rasio Ongkos Kirim Terhadap Harga Produk (Median)**")
+    st.subheader("Median Rasio Ongkos Kirim Terhadap Harga Produk")
     
     median_freight_value = df_freight_analysis['freight_value'].median()
     median_price_value = df_freight_analysis['price'].median()
@@ -457,19 +457,16 @@ with col1:
         median_freight_percentage = (median_freight_value / median_price_value) * 100
     else:
         median_freight_percentage = 0
-        
-    st.metric(
-        label="Rasio Ongkir Median (dari Harga Median)",
-        value=f"{median_freight_percentage:.2f}%",
-        help="Biaya pengiriman median dibagi dengan harga produk median. Ini mewakili biaya kirim untuk produk 'tipikal'."
-    )
-    st.info(
-        "Metrik berbasis median ini memberikan gambaran biaya kirim yang lebih representatif "
-        "untuk produk pada umumnya, karena tidak terlalu dipengaruhi oleh produk yang sangat mahal atau sangat murah."
-    )
-
+    value_str = f"{median_freight_percentage:.2f}%"
+    
+    st.markdown(f"""
+    <div style="text-align: center; padding-top: 20px;">
+        <p style="font-size: 64px; font-weight: bold;">{value_str}</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
 with col2:
-    st.markdown("**Dampak Ongkos Kirim terhadap Skor Ulasan**")
+    st.subheader("Skor Ulasan Rata-rata Menurun saat Ongkir Naik")
     
     bins = [0, 10, 20, 30, 45, float('inf')]
     labels = ["0-10", "10-20", "20-30", "30-45", "45+"]
@@ -481,7 +478,7 @@ with col2:
         x='freight_bin', 
         y='review_score',
         text=review_by_freight['review_score'].round(2),
-        title="Skor Ulasan Rata-rata Cenderung Menurun Saat Ongkir Naik",
+        title="Pengaruh Ongkos Kirim terhadap Skor Ulasan",
         labels={'freight_bin': 'Kelompok Ongkos Kirim (R$)', 'review_score': 'Skor Ulasan Rata-rata'},
         color_discrete_sequence=['#d62728'],
         template=PLOTLY_TEMPLATE
