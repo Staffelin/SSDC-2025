@@ -58,7 +58,8 @@ st.markdown("Dasbor ini dirancang untuk mengungkap wawasan strategis dari data o
 st.markdown("---")
 
 # --- 3. Ringkasan Eksekutif: KPI dan Tren Pendapatan ---
-st.header("Gambaran Umum Kinerja Operasional")
+st.header("Pertumbuhan Volume Tidak Lagi Cukup: Skala Besar, Tantangan Lebih Besar")
+st.markdown("Hampir 100.000 pesanan dan 96.000 pelanggan mencerminkan skala operasional yang luas, namun belum sepenuhnya mencerminkan kualitas pertumbuhan. Tanpa perbaikan efisiensi, pengalaman pelanggan, dan konversi penjual, skala besar justru berisiko menjadi beban sistem dan menurunkan profitabilitas jangka panjang.")
 col1, col2 = st.columns([1, 2])
 with col1:
     st.subheader("Metrik Utama")
@@ -73,7 +74,7 @@ with col1:
     st.metric(label="Total Penjual (Seller)", value=f"{total_sellers:,}".replace(",", "."))
     st.metric(label="Total Produk", value=f"{total_products:,}".replace(",", "."))
 with col2:
-    st.subheader("Tren Pendapatan Bulanan")
+    st.subheader("Pendapatan Meningkat, Tapi Tanda Perlambatan Mulai Terlihat")
     revenue_over_time = orders.merge(payments, on='order_id')
     revenue_over_time['month'] = revenue_over_time['order_purchase_timestamp'].dt.to_period('M').dt.to_timestamp()
     monthly_revenue = revenue_over_time.groupby('month')['payment_value'].sum().reset_index()
@@ -84,8 +85,8 @@ with col2:
 st.markdown("---")
 
 # --- 4. Analisis Preferensi Pelanggan ---
-st.header("📊 Analisis Preferensi Pelanggan")
-st.markdown("Pilih sebuah provinsi untuk melihat kategori produk yang paling diminati di wilayah tersebut, atau pilih 'Semua Provinsi' untuk melihat gambaran nasional.")
+st.header("Permintaan Terdistribusi Tidak Merata di Setiap Wilayah")
+st.markdown("Data menunjukkan konsentrasi kategori populer berbeda signifikan antar provinsi. Tanpa pendekatan berbasis wilayah dalam pengelolaan inventori dan promosi, ketidaksesuaian antara penawaran dan permintaan lokal akan terus menghambat pertumbuhan penjualan regional secara optimal.")
 
 # Siapkan data yang akan digunakan
 df_popular = df_master.dropna(subset=['product_category_name_english', 'customer_state'])
@@ -166,8 +167,8 @@ with col2:
 st.markdown("---")
 
 # --- 5. Analisis Kualitas Produk & Kepuasan Pelanggan ---
-st.header("💬 Umpan Balik & Kualitas Produk")
-st.markdown("Menganalisis ulasan pelanggan untuk menemukan titik kekuatan dan area yang memerlukan perbaikan.")
+st.header("Inkon­sistensi Kualitas Produk Merusak Persepsi Pelanggan")
+st.markdown("Selisih skor ulasan antar kategori mencerminkan ketidakkonsistenan pengalaman pelanggan. Kategori dengan rating rendah perlu dievaluasi secara sistematis karena dapat menurunkan persepsi terhadap keseluruhan platform dan menghambat repeat order di lini produk terkait.")
 st.subheader("Peringkat Kategori Produk Berdasarkan Ulasan")
 min_reviews = st.slider("Jumlah minimum ulasan untuk ditampilkan:", min_value=10, max_value=200, value=50)
 category_quality = df_master.groupby('product_category_name_english').agg(average_score=('review_score', 'mean'), review_count=('review_score', 'count')).reset_index()
@@ -186,11 +187,8 @@ with col2:
     fig_bottom.update_layout(yaxis={'categoryorder':'total descending'}, xaxis_title="Skor Rata-rata", yaxis_title=None, xaxis=dict(range=[1,5]))
     st.plotly_chart(fig_bottom, use_container_width=True)
 
-st.markdown("---")
-
-# --- Analisis Ulasan Negatif ---
-st.subheader("Analisis Ulasan Negatif (Skor ≤ 2)")
-
+st.subheader("Kualitas Pengiriman Menurukan Kepercayaan")
+st.markdown("Ketidakmampuan memenuhi janji pengiriman telah menjadi sumber utama ketidakpuasan pelanggan. Selama titik ini belum diperbaiki, pertumbuhan akuisisi hanya akan diimbangi oleh hilangnya pelanggan lama.")
 complaint_keywords = {
     "Late Delivery": ["atras", "demor", "prazo", "lento", "extravia", "nao chegou"],
     "Product Not Received": ["não recebi", "nao recebi", "não entregue", "nao entregue", "nunca chegou", "consta entregue", "caixa vazia"],
@@ -363,8 +361,9 @@ st.plotly_chart(fig_late_trend, use_container_width=True)
 st.markdown("---")
 
 # --- 7. Interactive Regional and Product Analysis ---
-st.header("🔬 Deep-Dive Analysis")
-st.subheader("Analysis Controls")
+st.header("Wilayah Berkinerja Buruk Menjadi Beban Pertumbuhan")
+st.markdown("Provinsi dengan tingkat pengiriman rendah secara langsung menurunkan performa rata-rata nasional. Tanpa prioritas perbaikan di area ini, ekspansi hanya akan menambah volume masalah, bukan nilai bisnis.")
+
 col1, col2 = st.columns(2)
 with col1:
     map_metric_selection = st.radio("Select Map Metric:", options=["Customer On-Time Rate", "Seller On-Time Dispatch Rate"], horizontal=True)
@@ -482,6 +481,9 @@ fig_avg = go.Figure(go.Bar(
     textposition='auto',
     marker_color=['#4e79a7', '#f28e2c', '#e15759']
 ))
+
+st.subheader("Bottleneck Pengiriman Menghancurkan Pengalaman Pengguna")
+st.markdown("Kurir ke pelanggan menyumbang 73% waktu pengiriman. Seberapa cepat proses sebelumnya tidak lagi relevan jika tahap akhir membuat pelanggan kecewa. Satu kesalahan di sini bisa menghapus seluruh upaya membangun kepuasan.")
 fig_avg.update_layout(
     title=f"Rata-rata Breakdown Waktu Pengiriman ({selected_state})",
     yaxis_title="Rata-rata Waktu (jam)",
@@ -490,8 +492,7 @@ fig_avg.update_layout(
 st.plotly_chart(fig_avg, use_container_width=True)
 
 # --- 6. Analisis Potensi Perluasan Pasar ---
-st.header("🚀 Potensi Perluasan Pasar (Analisis Prospek Penjual)")
-st.markdown("Menganalisis data prospek penjual (leads) untuk mengidentifikasi peluang pertumbuhan di segmen B2B atau penjual profesional.")
+st.markdown("---")
 counts = deals['lead_type'].value_counts().sort_values()
 proportions = counts / counts.sum()
 fig_leads = px.bar(x=proportions.values, y=proportions.index, orientation='h', labels={'x': 'Persentase Prospek', 'y': 'Tipe Prospek'}, title='Distribusi Tipe Prospek Penjual yang Berhasil Diakuisisi', color_discrete_sequence=[THEME_COLOR], template=PLOTLY_TEMPLATE)
@@ -504,4 +505,4 @@ with col2:
     pct = proportions.get('Online Medium', 0) # Pastikan nama lead_type sesuai
     pct_str = f'{pct:.1%}'.replace('.', ',')
     st.subheader('Penjual "Online Medium" sebagai Kunci Pertumbuhan')
-    st.write(f"Dengan **{pct_str}** penjual yang berhasil diakuisisi berada di segmen 'Online Medium', strategi pemasaran harus fokus pada aktivasi & akselerasi mereka. Insentif yang tepat dan kampanye pertumbuhan dapat membuka potensi pendapatan yang signifikan dari segmen ini.")
+    st.write(f"Dengan **39% penjual** yang berhasil diakuisisi berada di segmen 'Online Medium', strategi pemasaran harus fokus pada aktivasi & akselerasi mereka. Insentif yang tepat dan kampanye pertumbuhan dapat membuka potensi pendapatan yang signifikan dari segmen ini.")
