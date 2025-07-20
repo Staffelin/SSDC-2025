@@ -4,13 +4,11 @@ import plotly.express as px
 import numpy as np
 import plotly.graph_objects as go
 
-# --- 1. Konfigurasi dan Pemuatan Data ---
 st.set_page_config(
     page_title="Analisis Kinerja E-commerce",
     layout="wide"
 )
 
-# --- Variabel Desain Global ---
 THEME_COLOR = "royalblue"
 PLOTLY_TEMPLATE = "plotly_white"
 
@@ -39,10 +37,8 @@ def format_snake_case(s):
     if isinstance(s, str): return s.replace('_', ' ').title()
     return s
 
-# Memuat semua data
 payments, customers, orders, sellers, products, order_items, reviews, cat_trans, deals, leads = load_data()
 
-# --- Membuat DataFrame Utama (df_master) ---
 items = order_items.merge(products, on="product_id", how="left")
 items = items.merge(cat_trans, on="product_category_name", how="left")
 df_master = orders.merge(reviews, on="order_id", how="left")
@@ -50,19 +46,14 @@ df_master = df_master.merge(items, on="order_id", how="left")
 df_master = df_master.merge(customers, on='customer_id', how='left')
 df_master['product_category_name_english'] = df_master['product_category_name_english'].dropna().apply(format_snake_case)
 
-# --- MULAI DASBOR ---
-
-# --- 2. Judul dan Kalimat Pembuka ---
 st.title("📈 Analisis Kinerja Bisnis E-commerce")
 st.markdown("Dasbor ini dirancang untuk mengungkap wawasan strategis dari data operasional, mencakup analisis mendalam mengenai **preferensi pelanggan**, **kualitas produk**, dan **kinerja pengiriman** untuk mendorong pertumbuhan bisnis.")
 st.markdown("---")
 
-# --- 3. Ringkasan Eksekutif: KPI dan Tren Pendapatan ---
-st.header("Pertumbuhan Volume Tidak Lagi Cukup: Skala Besar, Tantangan Lebih Besar")
-st.markdown("Hampir 100.000 pesanan dan 96.000 pelanggan mencerminkan skala operasional yang luas, namun belum sepenuhnya mencerminkan kualitas pertumbuhan. Tanpa perbaikan efisiensi, pengalaman pelanggan, dan konversi penjual, skala besar justru berisiko menjadi beban sistem dan menurunkan profitabilitas jangka panjang.")
+st.header("Perusahaan Sudah Berkembang Pesat, Tetapi Akankah Terus Seperti Ini?")
 col1, col2 = st.columns([1, 2])
 with col1:
-    st.subheader("Metrik Utama")
+    st.subheader("Statistik Terlihat Bagus, Namun...")
     total_revenue = payments['payment_value'].sum()
     total_customers = customers['customer_unique_id'].nunique()
     total_orders = orders['order_id'].nunique()
@@ -74,102 +65,25 @@ with col1:
     st.metric(label="Total Penjual (Seller)", value=f"{total_sellers:,}".replace(",", "."))
     st.metric(label="Total Produk", value=f"{total_products:,}".replace(",", "."))
 with col2:
-    st.subheader("Pendapatan Meningkat, Tapi Tanda Perlambatan Mulai Terlihat")
+    st.subheader("Pendapatan Sudah Mulai Stagnan")
     revenue_over_time = orders.merge(payments, on='order_id')
     revenue_over_time['month'] = revenue_over_time['order_purchase_timestamp'].dt.to_period('M').dt.to_timestamp()
     monthly_revenue = revenue_over_time.groupby('month')['payment_value'].sum().reset_index()
-    fig = px.area(monthly_revenue, x='month', y='payment_value', title="Pertumbuhan Pendapatan Seiring Waktu", labels={'month': 'Bulan', 'payment_value': 'Total Pendapatan (R$)'}, color_discrete_sequence=[THEME_COLOR], template=PLOTLY_TEMPLATE)
+    fig = px.area(monthly_revenue, x='month', y='payment_value', title="Sudah 9 Bulan Tanpa Rekor Baru Pendapatan (Terakhir Nov 2017)", labels={'month': 'Bulan', 'payment_value': 'Total Pendapatan (R$)'}, color_discrete_sequence=[THEME_COLOR], template=PLOTLY_TEMPLATE)
     fig.update_layout(height=450)
     st.plotly_chart(fig, use_container_width=True)
+st.markdown("Hampir 100.000 pesanan dan 96.000 pelanggan mencerminkan skala operasional yang luas, namun belum sepenuhnya mencerminkan kualitas pertumbuhan. Tanpa perbaikan efisiensi, pengalaman pelanggan, dan konversi penjual, skala besar justru berisiko menjadi beban sistem dan menurunkan profitabilitas jangka panjang.")
 
 st.markdown("---")
 
-# --- 4. Analisis Preferensi Pelanggan ---
-st.header("Permintaan Terdistribusi Tidak Merata di Setiap Wilayah")
-st.markdown("Data menunjukkan konsentrasi kategori populer berbeda signifikan antar provinsi. Tanpa pendekatan berbasis wilayah dalam pengelolaan inventori dan promosi, ketidaksesuaian antara penawaran dan permintaan lokal akan terus menghambat pertumbuhan penjualan regional secara optimal.")
-
-# Siapkan data yang akan digunakan
-df_popular = df_master.dropna(subset=['product_category_name_english', 'customer_state'])
-
-# <-- MODIFIKASI: Menambahkan 'Semua Provinsi' ke dalam daftar dan menjadikannya default -->
-provinsi_list = ['Semua Provinsi'] + sorted(df_popular['customer_state'].unique().tolist())
-selected_state = st.selectbox("Pilih Wilayah Analisis:", provinsi_list)
-
-# --- Tata letak dengan peta di kiri dan grafik di kanan ---
-col1, col2 = st.columns([1, 2])
-
-with col1:
-    # Tampilkan peta
-    map_title = "Peta Pesanan Nasional" if selected_state == 'Semua Provinsi' else f"Lokasi Provinsi: {selected_state}"
-    st.markdown(f"**{map_title}**")
-    
-    state_order_counts = df_popular['customer_state'].value_counts().reset_index()
-    state_order_counts.columns = ['state', 'orders']
-    
-    geojson_url = "https://raw.githubusercontent.com/codeforgermany/click_that_hood/main/public/data/brazil-states.geojson"
-    
-    fig_map = px.choropleth(
-        state_order_counts,
-        geojson=geojson_url,
-        locations='state',
-        featureidkey='properties.sigla',
-        color='orders',
-        color_continuous_scale="Blues",
-        scope="south america"
-    )
-    
-    # <-- MODIFIKASI: Logika kondisional untuk zoom peta -->
-    if selected_state == 'Semua Provinsi':
-        # Tampilkan seluruh Brasil
-        fig_map.update_geos(fitbounds="geojson", visible=False)
-    else:
-        # Zoom ke provinsi yang dipilih
-        fig_map.update_geos(fitbounds="locations", visible=False)
-        fig_map.data[0].locations = [selected_state]
-
-    fig_map.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
-    st.plotly_chart(fig_map, use_container_width=True)
-
-with col2:
-    # <-- MODIFIKASI: Logika kondisional untuk data grafik batang -->
-    if selected_state == 'Semua Provinsi':
-        st.markdown("**Top 10 Kategori Produk (Nasional)**")
-        top_cats_data = df_popular['product_category_name_english'].value_counts().head(10).reset_index()
-    else:
-        st.markdown(f"**Top 10 Kategori Produk di Provinsi {selected_state}**")
-        top_cats_data = (
-            df_popular[df_popular['customer_state'] == selected_state]
-            ['product_category_name_english']
-            .value_counts()
-            .head(10)
-            .reset_index()
-        )
-    
-    top_cats_data.columns = ['Kategori', 'Jumlah Pesanan']
-    
-    fig_top_cats = px.bar(
-        top_cats_data,
-        x='Jumlah Pesanan',
-        y='Kategori',
-        text='Jumlah Pesanan',
-        orientation='h',
-        color_discrete_sequence=[THEME_COLOR],
-        template=PLOTLY_TEMPLATE
-    )
-    fig_top_cats.update_layout(
-        yaxis={'categoryorder':'total ascending'},
-        height=450,
-        yaxis_title="Kategori Produk",
-        xaxis_title="Jumlah Pesanan"
-    )
-    st.plotly_chart(fig_top_cats, use_container_width=True)
+st.header("Bagiamana Kondisi Perusahaan Saat Ini?")
+st.markdown("Bagian ini akan menelusuri tentang kondisi *e-commerce* saat ini, seperti tanggapan pelanggan terhadap produk di dalamnya serta kinerja operasional pengiriman.")
 
 st.markdown("---")
 
-# --- 5. Analisis Kualitas Produk & Kepuasan Pelanggan ---
-st.header("Inkon­sistensi Kualitas Produk Merusak Persepsi Pelanggan")
-st.markdown("Selisih skor ulasan antar kategori mencerminkan ketidakkonsistenan pengalaman pelanggan. Kategori dengan rating rendah perlu dievaluasi secara sistematis karena dapat menurunkan persepsi terhadap keseluruhan platform dan menghambat repeat order di lini produk terkait.")
-st.subheader("Peringkat Kategori Produk Berdasarkan Ulasan")
+st.header("Apa yang Pelanggan Katakan Tentang Produk Kita?")
+st.markdown("*Rating* yang diberikan oleh pelanggan dapat dipengaruhi oleh berbagai faktor, seperti keterlambatan, barang yang tidak sampai, ataupun cacat produk. Faktor ini dapat menurunkan kepercayaan pelanggan terhadap platform secara keseluruhan dan mengurangi *repeat order* pada kategori yang sama.")
+st.subheader("Apa Kategori Produk yang Paling Disukai/Dibenci Pelanggan?")
 min_reviews = st.slider("Jumlah minimum ulasan untuk ditampilkan:", min_value=10, max_value=200, value=50)
 category_quality = df_master.groupby('product_category_name_english').agg(average_score=('review_score', 'mean'), review_count=('review_score', 'count')).reset_index()
 category_quality_filtered = category_quality[category_quality['review_count'] >= min_reviews]
@@ -268,11 +182,6 @@ items['product_category_name_english'] = items['product_category_name_english'].
 
 # --- 3. Page Configuration ---
 st.set_page_config(page_title="E-commerce Operational Dashboard", layout="wide")
-
-# --- 4. Sidebar ---
-with st.sidebar:
-    st.title("⚙️ Dashboard Controls")
-    st.write("Use the controls on the main page to filter and drill-down into the data.")
 
 # --- 5. Main Dashboard Title ---
 st.title("📈 E-commerce Operational Dashboard")
@@ -551,6 +460,89 @@ with col2:
     )
     fig_review_freight.update_layout(yaxis=dict(range=[3.5, 5]))
     st.plotly_chart(fig_review_freight, use_container_width=True)
+
+# --- 4. Analisis Preferensi Pelanggan ---
+st.header("Permintaan Terdistribusi Tidak Merata di Setiap Wilayah")
+st.markdown("Data menunjukkan konsentrasi kategori populer berbeda signifikan antar provinsi. Tanpa pendekatan berbasis wilayah dalam pengelolaan inventori dan promosi, ketidaksesuaian antara penawaran dan permintaan lokal akan terus menghambat pertumbuhan penjualan regional secara optimal.")
+
+# Siapkan data yang akan digunakan
+df_popular = df_master.dropna(subset=['product_category_name_english', 'customer_state'])
+
+# <-- MODIFIKASI: Menambahkan 'Semua Provinsi' ke dalam daftar dan menjadikannya default -->
+provinsi_list = ['Semua Provinsi'] + sorted(df_popular['customer_state'].unique().tolist())
+selected_state = st.selectbox("Pilih Wilayah Analisis:", provinsi_list)
+
+# --- Tata letak dengan peta di kiri dan grafik di kanan ---
+col1, col2 = st.columns([1, 2])
+
+with col1:
+    # Tampilkan peta
+    map_title = "Peta Pesanan Nasional" if selected_state == 'Semua Provinsi' else f"Lokasi Provinsi: {selected_state}"
+    st.markdown(f"**{map_title}**")
+    
+    state_order_counts = df_popular['customer_state'].value_counts().reset_index()
+    state_order_counts.columns = ['state', 'orders']
+    
+    geojson_url = "https://raw.githubusercontent.com/codeforgermany/click_that_hood/main/public/data/brazil-states.geojson"
+    
+    fig_map = px.choropleth(
+        state_order_counts,
+        geojson=geojson_url,
+        locations='state',
+        featureidkey='properties.sigla',
+        color='orders',
+        color_continuous_scale="Blues",
+        scope="south america"
+    )
+    
+    # <-- MODIFIKASI: Logika kondisional untuk zoom peta -->
+    if selected_state == 'Semua Provinsi':
+        # Tampilkan seluruh Brasil
+        fig_map.update_geos(fitbounds="geojson", visible=False)
+    else:
+        # Zoom ke provinsi yang dipilih
+        fig_map.update_geos(fitbounds="locations", visible=False)
+        fig_map.data[0].locations = [selected_state]
+
+    fig_map.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
+    st.plotly_chart(fig_map, use_container_width=True)
+
+with col2:
+    # <-- MODIFIKASI: Logika kondisional untuk data grafik batang -->
+    if selected_state == 'Semua Provinsi':
+        st.markdown("**Top 10 Kategori Produk (Nasional)**")
+        top_cats_data = df_popular['product_category_name_english'].value_counts().head(10).reset_index()
+    else:
+        st.markdown(f"**Top 10 Kategori Produk di Provinsi {selected_state}**")
+        top_cats_data = (
+            df_popular[df_popular['customer_state'] == selected_state]
+            ['product_category_name_english']
+            .value_counts()
+            .head(10)
+            .reset_index()
+        )
+    
+    top_cats_data.columns = ['Kategori', 'Jumlah Pesanan']
+    
+    fig_top_cats = px.bar(
+        top_cats_data,
+        x='Jumlah Pesanan',
+        y='Kategori',
+        text='Jumlah Pesanan',
+        orientation='h',
+        color_discrete_sequence=[THEME_COLOR],
+        template=PLOTLY_TEMPLATE
+    )
+    fig_top_cats.update_layout(
+        yaxis={'categoryorder':'total ascending'},
+        height=450,
+        yaxis_title="Kategori Produk",
+        xaxis_title="Jumlah Pesanan"
+    )
+    st.plotly_chart(fig_top_cats, use_container_width=True)
+
+st.markdown("---")
+
 
 # --- 6. Analisis Potensi Perluasan Pasar ---
 st.markdown("---")
