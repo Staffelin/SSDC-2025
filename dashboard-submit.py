@@ -48,7 +48,7 @@ df_master = df_master.merge(customers, on='customer_id', how='left')
 df_master['product_category_name_english'] = df_master['product_category_name_english'].dropna().apply(format_snake_case)
 
 st.title("Scalability Through Continuity")
-st.markdown("Made by Astutea - SSDC2025006")
+st.markdown("Team: Astutea - SSDC2025006")
 st.markdown(" E-Commerce telah mencapai skala yang besar dalam waktu yang pesat, dengan hampir 100.000 pesanan dan 96.000 pelanggan dalam 2 tahun. Namun, pertumbuhan pendapatan menunjukkan **tanda-tanda stagnasi** dan perusahaan masih memiliki banyak **permasalahan dalam segi kualitas pengiriman, relevansi produk, serta kerataan penjual**. *Dashboard* ini mengungkap area strategis yang harus diperbaiki untuk mendorong pertumbuhan berkelanjutan. Fokus pembahasan diarahkan pada **memahami preferensi pelanggan dan inventori, optimasi logistik, dan pertumbuhan pasar yang akurat**. Diharapkan agar strategi yang diusulkan pada *dashboard* ini dapat menjadi perintis dalam memutarkan kembali roda pertumbuhan perusahaan.")
 st.markdown("---")
 
